@@ -97,6 +97,9 @@ type forceCacheBillingKeyType struct{}
 type accountWithLoad struct {
 	account  *Account
 	loadInfo *AccountLoadInfo
+	// routingRank 是模型路由的梯队序号（0 = 最高优先梯队，越小越优先）。
+	// 仅模型路由选号路径会赋非零值；其余路径保持 0，排序行为与原先一致。
+	routingRank int
 }
 
 var ForceCacheBillingContextKey = forceCacheBillingKeyType{}
@@ -2295,9 +2298,12 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 	}
 
 	// 获取模型路由配置（仅 anthropic 平台）
+	// routingTierRank: accountID -> 梯队序号（0 = 具体规则优先梯队，1 = "*" 兜底梯队）。
+	// 用于在 Layer 1 内保证"先穷尽具体规则账号，再回落到 * 账号"。
 	var routingAccountIDs []int64
+	var routingTierRank map[int64]int
 	if group != nil && requestedModel != "" && group.Platform == PlatformAnthropic {
-		routingAccountIDs = group.GetRoutingAccountIDs(requestedModel)
+		routingAccountIDs, routingTierRank = group.GetRoutingAccountIDsTiered(requestedModel)
 		if s.debugModelRoutingEnabled() {
 			logger.LegacyPrintf("service.gateway", "[ModelRoutingDebug] context group routing: group_id=%d model=%s enabled=%v rules=%d matched_ids=%v session=%s sticky_account=%d",
 				group.ID, requestedModel, group.ModelRoutingEnabled, len(group.ModelRouting), routingAccountIDs, shortSessionHash(sessionHash), stickyAccountID)
@@ -2489,14 +2495,22 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 					loadInfo = &AccountLoadInfo{AccountID: acc.ID}
 				}
 				if loadInfo.LoadRate < 100 {
-					routingAvailable = append(routingAvailable, accountWithLoad{account: acc, loadInfo: loadInfo})
+					routingAvailable = append(routingAvailable, accountWithLoad{
+						account:     acc,
+						loadInfo:    loadInfo,
+						routingRank: routingTierRank[acc.ID],
+					})
 				}
 			}
 
 			if len(routingAvailable) > 0 {
-				// 排序：优先级 > 负载率 > 最后使用时间
+				// 排序：路由梯队 > 优先级 > 负载率 > 最后使用时间。
+				// 梯队为第一关键字，保证具体规则账号（梯队 0）永远排在 "*" 兜底账号（梯队 1）之前。
 				sort.SliceStable(routingAvailable, func(i, j int) bool {
 					a, b := routingAvailable[i], routingAvailable[j]
+					if a.routingRank != b.routingRank {
+						return a.routingRank < b.routingRank
+					}
 					if a.account.Priority != b.account.Priority {
 						return a.account.Priority < b.account.Priority
 					}
@@ -2884,29 +2898,36 @@ func (s *GatewayService) ResolveGroupByID(ctx context.Context, groupID int64) (*
 }
 
 func (s *GatewayService) routingAccountIDsForRequest(ctx context.Context, groupID *int64, requestedModel string, platform string) []int64 {
+	ids, _ := s.routingAccountTiersForRequest(ctx, groupID, requestedModel, platform)
+	return ids
+}
+
+// routingAccountTiersForRequest 解析请求模型的分层路由账号（含 "*" 兜底梯队）。
+// 返回 (有序账号 ID, accountID->梯队序号)。仅 anthropic 分组生效。
+func (s *GatewayService) routingAccountTiersForRequest(ctx context.Context, groupID *int64, requestedModel string, platform string) ([]int64, map[int64]int) {
 	if groupID == nil || requestedModel == "" || platform != PlatformAnthropic {
-		return nil
+		return nil, nil
 	}
 	group, err := s.resolveGroupByID(ctx, *groupID)
 	if err != nil || group == nil {
 		if s.debugModelRoutingEnabled() {
 			logger.LegacyPrintf("service.gateway", "[ModelRoutingDebug] resolve group failed: group_id=%v model=%s platform=%s err=%v", derefGroupID(groupID), requestedModel, platform, err)
 		}
-		return nil
+		return nil, nil
 	}
 	// Preserve existing behavior: model routing only applies to anthropic groups.
 	if group.Platform != PlatformAnthropic {
 		if s.debugModelRoutingEnabled() {
 			logger.LegacyPrintf("service.gateway", "[ModelRoutingDebug] skip: non-anthropic group platform: group_id=%d group_platform=%s model=%s", group.ID, group.Platform, requestedModel)
 		}
-		return nil
+		return nil, nil
 	}
-	ids := group.GetRoutingAccountIDs(requestedModel)
+	ids, tierRank := group.GetRoutingAccountIDsTiered(requestedModel)
 	if s.debugModelRoutingEnabled() {
 		logger.LegacyPrintf("service.gateway", "[ModelRoutingDebug] routing lookup: group_id=%d model=%s enabled=%v rules=%d matched_ids=%v",
 			group.ID, requestedModel, group.ModelRoutingEnabled, len(group.ModelRouting), ids)
 	}
-	return ids
+	return ids, tierRank
 }
 
 func (s *GatewayService) resolveGatewayGroup(ctx context.Context, groupID *int64) (*Group, *int64, error) {
@@ -3725,6 +3746,11 @@ func shuffleWithinSortGroups(accounts []accountWithLoad) {
 
 // sameAccountWithLoadGroup 判断两个 accountWithLoad 是否属于同一排序组
 func sameAccountWithLoadGroup(a, b accountWithLoad) bool {
+	// 路由梯队不同的账号不属于同一组，避免 shuffle 跨梯队打散导致 "*" 账号被提前选中。
+	// 非路由路径 routingRank 均为 0，此处恒等，行为与原先一致。
+	if a.routingRank != b.routingRank {
+		return false
+	}
 	if a.account.Priority != b.account.Priority {
 		return false
 	}
@@ -3852,7 +3878,7 @@ func shuffleWithinPriority(accounts []*Account) {
 // selectAccountForModelWithPlatform 选择单平台账户（完全隔离）
 func (s *GatewayService) selectAccountForModelWithPlatform(ctx context.Context, groupID *int64, sessionHash string, requestedModel string, excludedIDs map[int64]struct{}, platform string) (*Account, error) {
 	preferOAuth := platform == PlatformGemini
-	routingAccountIDs := s.routingAccountIDsForRequest(ctx, groupID, requestedModel, platform)
+	routingAccountIDs, routingTierRank := s.routingAccountTiersForRequest(ctx, groupID, requestedModel, platform)
 
 	// require_privacy_set: 获取分组信息
 	var schedGroup *Group
@@ -3958,6 +3984,16 @@ func (s *GatewayService) selectAccountForModelWithPlatform(ctx context.Context, 
 			}
 			if selected == nil {
 				selected = acc
+				continue
+			}
+			// 路由梯队为第一关键字：具体规则账号（梯队 0）永远优先于 "*" 兜底账号（梯队 1）。
+			// 非路由请求 routingTierRank 为 nil，accRank/selRank 均为 0，行为与原先一致。
+			accRank := routingTierRank[acc.ID]
+			selRank := routingTierRank[selected.ID]
+			if accRank != selRank {
+				if accRank < selRank {
+					selected = acc
+				}
 				continue
 			}
 			if acc.Priority < selected.Priority {
@@ -4120,7 +4156,7 @@ func (s *GatewayService) selectAccountForModelWithPlatform(ctx context.Context, 
 // 查询原生平台账户 + 启用 mixed_scheduling 的 antigravity 账户
 func (s *GatewayService) selectAccountWithMixedScheduling(ctx context.Context, groupID *int64, sessionHash string, requestedModel string, excludedIDs map[int64]struct{}, nativePlatform string) (*Account, error) {
 	preferOAuth := nativePlatform == PlatformGemini
-	routingAccountIDs := s.routingAccountIDsForRequest(ctx, groupID, requestedModel, nativePlatform)
+	routingAccountIDs, routingTierRank := s.routingAccountTiersForRequest(ctx, groupID, requestedModel, nativePlatform)
 
 	// require_privacy_set: 获取分组信息
 	var schedGroup *Group
@@ -4226,6 +4262,16 @@ func (s *GatewayService) selectAccountWithMixedScheduling(ctx context.Context, g
 			}
 			if selected == nil {
 				selected = acc
+				continue
+			}
+			// 路由梯队为第一关键字：具体规则账号（梯队 0）永远优先于 "*" 兜底账号（梯队 1）。
+			// 非路由请求 routingTierRank 为 nil，accRank/selRank 均为 0，行为与原先一致。
+			accRank := routingTierRank[acc.ID]
+			selRank := routingTierRank[selected.ID]
+			if accRank != selRank {
+				if accRank < selRank {
+					selected = acc
+				}
 				continue
 			}
 			if acc.Priority < selected.Priority {

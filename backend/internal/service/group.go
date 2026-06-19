@@ -147,25 +147,89 @@ func IsGroupContextValid(group *Group) bool {
 }
 
 // GetRoutingAccountIDs 根据请求模型获取路由账号 ID 列表
-// 返回匹配的优先账号 ID 列表，如果没有匹配规则则返回 nil
+// 返回匹配的优先账号 ID 列表（含 "*" 兜底梯队，已按梯队顺序去重）；
+// 如果没有匹配规则则返回 nil。
 func (g *Group) GetRoutingAccountIDs(requestedModel string) []int64 {
+	ids, _ := g.GetRoutingAccountIDsTiered(requestedModel)
+	return ids
+}
+
+// GetRoutingAccountIDsTiered 返回模型路由的分层优先账号列表。
+//
+// 返回值：
+//   - ids: 按优先梯队排序的账号 ID（命中的具体规则在前，"*" 通配兜底在后），已去重；
+//   - tierRank: accountID -> 梯队序号（0 = 最高优先梯队，数字越小越优先）。
+//
+// 设计意图：用户在模型路由里既配置了具体模型规则（如 claude-opus-4-7 → 中转账号），
+// 又配置了 "*" 兜底规则（如 * → AWS 账号）。调度时应**先穷尽具体规则的优先账号，
+// 全部不可用后才回落到 "*" 账号**。把 "*" 作为一个严格更低的梯队追加进来，让选号逻辑
+// 用 tierRank 作为第一排序关键字即可保证该语义。
+//
+// 路由未启用或无匹配时返回 (nil, nil)。
+func (g *Group) GetRoutingAccountIDsTiered(requestedModel string) ([]int64, map[int64]int) {
 	if !g.ModelRoutingEnabled || len(g.ModelRouting) == 0 || requestedModel == "" {
-		return nil
+		return nil, nil
 	}
 
-	// 1. 精确匹配优先
-	if accountIDs, ok := g.ModelRouting[requestedModel]; ok && len(accountIDs) > 0 {
-		return accountIDs
+	matchedPattern, matchedIDs := g.matchRoutingRule(requestedModel)
+	if len(matchedIDs) == 0 {
+		return nil, nil
 	}
 
-	// 2. 通配符匹配（前缀匹配）
-	for pattern, accountIDs := range g.ModelRouting {
-		if matchModelPattern(pattern, requestedModel) && len(accountIDs) > 0 {
-			return accountIDs
+	ordered := make([]int64, 0, len(matchedIDs)+4)
+	tierRank := make(map[int64]int, len(matchedIDs)+4)
+	appendTier := func(ids []int64, tier int) {
+		for _, id := range ids {
+			if id <= 0 {
+				continue
+			}
+			if _, dup := tierRank[id]; dup {
+				continue
+			}
+			tierRank[id] = tier
+			ordered = append(ordered, id)
 		}
 	}
 
-	return nil
+	// 梯队 0：命中的具体规则
+	appendTier(matchedIDs, 0)
+	// 梯队 1："*" 兜底规则（仅当本次命中的规则本身不是 "*" 时追加）
+	if matchedPattern != "*" {
+		if wildcardIDs, ok := g.ModelRouting["*"]; ok && len(wildcardIDs) > 0 {
+			appendTier(wildcardIDs, 1)
+		}
+	}
+
+	return ordered, tierRank
+}
+
+// matchRoutingRule 返回命中请求模型的最具体路由规则及其账号列表。
+// 优先级：精确匹配 > 最长前缀通配匹配（"*" 前缀为空，天然最后兜底）。
+// 无匹配时返回 ("", nil)。
+func (g *Group) matchRoutingRule(requestedModel string) (string, []int64) {
+	// 1. 精确匹配优先
+	if accountIDs, ok := g.ModelRouting[requestedModel]; ok && len(accountIDs) > 0 {
+		return requestedModel, accountIDs
+	}
+
+	// 2. 通配符匹配：选最长前缀（最具体）的规则，确保确定性且让 "*" 兜底
+	bestPattern := ""
+	bestPrefixLen := -1
+	for pattern, accountIDs := range g.ModelRouting {
+		if len(accountIDs) == 0 || !matchModelPattern(pattern, requestedModel) {
+			continue
+		}
+		prefixLen := len(strings.TrimSuffix(pattern, "*"))
+		if prefixLen > bestPrefixLen {
+			bestPrefixLen = prefixLen
+			bestPattern = pattern
+		}
+	}
+	if bestPattern != "" {
+		return bestPattern, g.ModelRouting[bestPattern]
+	}
+
+	return "", nil
 }
 
 // matchModelPattern 检查模型是否匹配模式

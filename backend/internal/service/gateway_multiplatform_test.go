@@ -884,6 +884,64 @@ func TestGatewayService_SelectAccountForModelWithPlatform_RoutedFallbackToNormal
 	require.Equal(t, int64(1), acc.ID)
 }
 
+// TestGatewayService_SelectAccountForModelWithPlatform_WildcardTierLast 验证：
+// 当具体模型规则与 "*" 兜底规则共存时，调度先穷尽具体规则账号（梯队 0），
+// 只有它被排除后才回落到 "*" 账号（梯队 1）。
+func TestGatewayService_SelectAccountForModelWithPlatform_WildcardTierLast(t *testing.T) {
+	ctx := context.Background()
+	groupID := int64(31)
+	requestedModel := "claude-opus-4-7"
+
+	repo := &mockAccountRepoForPlatform{
+		accounts: []Account{
+			// 注意：account 2（兜底）的 Priority 数值更小（"更优先"），
+			// 用来证明梯队语义凌驾于 Priority —— 即便如此，梯队 0 的 account 1 仍先被选中。
+			{ID: 1, Platform: PlatformAnthropic, Priority: 5, Status: StatusActive, Schedulable: true},
+			{ID: 2, Platform: PlatformAnthropic, Priority: 1, Status: StatusActive, Schedulable: true},
+		},
+		accountsByID: map[int64]*Account{},
+	}
+	for i := range repo.accounts {
+		repo.accountsByID[repo.accounts[i].ID] = &repo.accounts[i]
+	}
+
+	groupRepo := &mockGroupRepoForGateway{
+		groups: map[int64]*Group{
+			groupID: {
+				ID:                  groupID,
+				Name:                "route-wildcard-tier",
+				Platform:            PlatformAnthropic,
+				Status:              StatusActive,
+				Hydrated:            true,
+				ModelRoutingEnabled: true,
+				ModelRouting: map[string][]int64{
+					requestedModel: {1}, // 梯队 0：具体规则
+					"*":            {2}, // 梯队 1：兜底
+				},
+			},
+		},
+	}
+
+	svc := &GatewayService{
+		accountRepo: repo,
+		cache:       &mockGatewayCacheForPlatform{},
+		cfg:         testConfig(),
+		groupRepo:   groupRepo,
+	}
+
+	// 1) 未排除任何账号：应选中梯队 0 的 account 1（即便 account 2 的 Priority 更小）。
+	acc, err := svc.selectAccountForModelWithPlatform(ctx, &groupID, "", requestedModel, nil, PlatformAnthropic)
+	require.NoError(t, err)
+	require.NotNil(t, acc)
+	require.Equal(t, int64(1), acc.ID, "梯队 0 账号必须优先于 * 兜底账号")
+
+	// 2) 排除梯队 0 的 account 1：才回落到梯队 1 的 account 2。
+	acc, err = svc.selectAccountForModelWithPlatform(ctx, &groupID, "", requestedModel, map[int64]struct{}{1: {}}, PlatformAnthropic)
+	require.NoError(t, err)
+	require.NotNil(t, acc)
+	require.Equal(t, int64(2), acc.ID, "梯队 0 全部排除后才回落到 * 兜底账号")
+}
+
 func TestGatewayService_SelectAccountForModelWithPlatform_NoModelSupport(t *testing.T) {
 	ctx := context.Background()
 
