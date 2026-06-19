@@ -239,6 +239,8 @@ type CreateGroupInput struct {
 	Default429CooldownSec     int
 	// 从指定分组复制账号（创建分组后在同一事务内绑定）
 	CopyAccountsFromGroupIDs []int64
+	// 直接指定归入该分组的账号 ID 列表（优先于 CopyAccountsFromGroupIDs）
+	AccountIDs []int64
 }
 
 type UpdateGroupInput struct {
@@ -287,6 +289,8 @@ type UpdateGroupInput struct {
 	Default429CooldownSec     *int
 	// 从指定分组复制账号（同步操作：先清空当前分组的账号绑定，再绑定源分组的账号）
 	CopyAccountsFromGroupIDs []int64
+	// 直接指定归入该分组的账号 ID 列表（优先于 CopyAccountsFromGroupIDs）
+	AccountIDs []int64
 }
 
 type CreateAccountInput struct {
@@ -1861,9 +1865,21 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 		mcpXMLInject = *input.MCPXMLInject
 	}
 
-	// 如果指定了复制账号的源分组，先获取账号 ID 列表
+	// 决定要绑定到分组的账号列表（优先级：AccountIDs > CopyAccountsFromGroupIDs）
 	var accountIDsToCopy []int64
-	if len(input.CopyAccountsFromGroupIDs) > 0 {
+	if len(input.AccountIDs) > 0 {
+		// 用户直接指定账号列表，去重
+		seen := make(map[int64]struct{})
+		for _, aid := range input.AccountIDs {
+			if aid > 0 {
+				if _, exists := seen[aid]; !exists {
+					seen[aid] = struct{}{}
+					accountIDsToCopy = append(accountIDsToCopy, aid)
+				}
+			}
+		}
+	} else if len(input.CopyAccountsFromGroupIDs) > 0 {
+		// 从指定分组复制账号
 		// 去重源分组 IDs
 		seen := make(map[int64]struct{})
 		uniqueSourceGroupIDs := make([]int64, 0, len(input.CopyAccountsFromGroupIDs))
@@ -2205,9 +2221,24 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 		s.authCacheInvalidator.InvalidateAuthCacheByGroupID(ctx, id)
 	}
 
-	// 如果指定了复制账号的源分组，同步绑定（替换当前分组的账号）
-	if len(input.CopyAccountsFromGroupIDs) > 0 {
-		// 去重源分组 IDs
+	// 决定要绑定到分组的账号列表（优先级：AccountIDs > CopyAccountsFromGroupIDs）
+	var accountIDsToSync []int64
+	var shouldReplaceAccounts bool
+
+	if len(input.AccountIDs) > 0 {
+		// 用户直接指定账号列表，去重
+		seen := make(map[int64]struct{})
+		for _, aid := range input.AccountIDs {
+			if aid > 0 {
+				if _, exists := seen[aid]; !exists {
+					seen[aid] = struct{}{}
+					accountIDsToSync = append(accountIDsToSync, aid)
+				}
+			}
+		}
+		shouldReplaceAccounts = true
+	} else if len(input.CopyAccountsFromGroupIDs) > 0 {
+		// 从指定分组复制账号（替换当前分组的账号）
 		seen := make(map[int64]struct{})
 		uniqueSourceGroupIDs := make([]int64, 0, len(input.CopyAccountsFromGroupIDs))
 		for _, srcGroupID := range input.CopyAccountsFromGroupIDs {
@@ -2234,19 +2265,23 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 		}
 
 		// 获取所有源分组的账号（去重）
-		accountIDsToCopy, err := s.groupRepo.GetAccountIDsByGroupIDs(ctx, uniqueSourceGroupIDs)
+		var err error
+		accountIDsToSync, err = s.groupRepo.GetAccountIDsByGroupIDs(ctx, uniqueSourceGroupIDs)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get accounts from source groups: %w", err)
 		}
+		shouldReplaceAccounts = true
+	}
 
+	if shouldReplaceAccounts {
 		// 先清空当前分组的所有账号绑定
 		if _, err := s.groupRepo.DeleteAccountGroupsByGroupID(ctx, id); err != nil {
 			return nil, fmt.Errorf("failed to clear existing account bindings: %w", err)
 		}
 
 		// require_oauth_only: 过滤掉 apikey 类型账号
-		if group.RequireOAuthOnly && (group.Platform == PlatformOpenAI || group.Platform == PlatformAntigravity || group.Platform == PlatformAnthropic || group.Platform == PlatformGemini) && len(accountIDsToCopy) > 0 {
-			accounts, err := s.accountRepo.GetByIDs(ctx, accountIDsToCopy)
+		if group.RequireOAuthOnly && (group.Platform == PlatformOpenAI || group.Platform == PlatformAntigravity || group.Platform == PlatformAnthropic || group.Platform == PlatformGemini) && len(accountIDsToSync) > 0 {
+			accounts, err := s.accountRepo.GetByIDs(ctx, accountIDsToSync)
 			if err != nil {
 				return nil, fmt.Errorf("failed to fetch accounts for oauth filter: %w", err)
 			}
@@ -2257,17 +2292,17 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 				}
 			}
 			var filtered []int64
-			for _, aid := range accountIDsToCopy {
+			for _, aid := range accountIDsToSync {
 				if _, ok := oauthIDs[aid]; ok {
 					filtered = append(filtered, aid)
 				}
 			}
-			accountIDsToCopy = filtered
+			accountIDsToSync = filtered
 		}
 
-		// 再绑定源分组的账号
-		if len(accountIDsToCopy) > 0 {
-			if err := s.groupRepo.BindAccountsToGroup(ctx, id, accountIDsToCopy); err != nil {
+		// 再绑定新的账号列表
+		if len(accountIDsToSync) > 0 {
+			if err := s.groupRepo.BindAccountsToGroup(ctx, id, accountIDsToSync); err != nil {
 				return nil, fmt.Errorf("failed to bind accounts to group: %w", err)
 			}
 		}

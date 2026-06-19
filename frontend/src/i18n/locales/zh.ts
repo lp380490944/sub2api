@@ -2426,6 +2426,12 @@ export default {
         hint: '可选多个分组，账号会自动去重',
         hintEdit: '⚠️ 注意：这会替换当前分组的所有账号绑定'
       },
+      accountIds: {
+        title: '选择账号',
+        tooltip: '直接选择归入该分组的账号。若同时指定了"从分组复制账号"，此选项优先。',
+        selectPlaceholder: '选择账号...',
+        hint: '可选择多个账号，优先于"从分组复制账号"'
+      },
       modelRouting: {
         title: '模型路由配置',
         tooltip:

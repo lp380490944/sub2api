@@ -2352,6 +2352,12 @@ export default {
         hint: 'Multiple groups can be selected, accounts will be deduplicated',
         hintEdit: '⚠️ Warning: This will replace all existing account bindings'
       },
+      accountIds: {
+        title: 'Select Accounts',
+        tooltip: 'Directly select accounts to include in this group. Takes priority over "Copy Accounts from Groups" if both are specified.',
+        selectPlaceholder: 'Select accounts...',
+        hint: 'Multiple accounts can be selected, takes priority over "Copy Accounts from Groups"'
+      },
       modelRouting: {
         title: 'Model Routing',
         tooltip: 'Configure specific model requests to be routed to designated accounts. Supports wildcard matching, e.g., claude-opus-* matches all opus models.',
