@@ -20,6 +20,10 @@ func TestDetectInterceptType_MaxTokensOneHaikuRequiresClaudeCodeClient(t *testin
 
 	isClaudeCode := detectInterceptType(body, "claude-haiku-4-5", 1, false, true)
 	require.Equal(t, InterceptTypeMaxTokensOneHaiku, isClaudeCode)
+
+	// fork: 流式 max_tokens=1 haiku 探测不拦截（mock 应答是非流式 JSON）
+	streaming := detectInterceptType(body, "claude-haiku-4-5", 1, true, true)
+	require.Equal(t, InterceptTypeNone, streaming)
 }
 
 func TestDetectInterceptType_SuggestionModeUnaffected(t *testing.T) {

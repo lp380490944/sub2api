@@ -623,6 +623,7 @@ func TestNewOpenAIGatewayService_InitializesOpenAIWSResolver(t *testing.T) {
 		nil,
 		nil,
 		nil,
+		nil, // settingService
 		nil, // identityProfileService (P0-3)
 		nil, // userPlatformQuotaRepo
 	)

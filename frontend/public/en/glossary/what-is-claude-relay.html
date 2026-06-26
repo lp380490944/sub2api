@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/png" href="/logo.png" />
 
-    <title>What Is a Claude API Proxy? How It Works &amp; Why It's Cheaper | TokenProvider</title>
-    <meta name="description" content="A Claude API proxy (also 'relay' or 'gateway') forwards your requests to Anthropic through a pool of accounts — giving you pay-as-you-go pricing below direct. How it works, tradeoffs, selection tips." />
+    <title>What Is a Claude API Proxy? How It Works &amp; When to Use One | TokenProvider</title>
+    <meta name="description" content="A Claude API proxy (also 'relay' or 'gateway') forwards your requests to Anthropic with pay-as-you-go pricing and one key for multiple models. How it works, tradeoffs, and how to pick one." />
     <meta name="keywords" content="claude api proxy, what is claude relay, claude gateway, cheap claude api, openai proxy, claude api middleware" />
     <meta name="robots" content="index,follow" />
     <meta name="theme-color" content="#14b8a6" />
@@ -19,14 +19,14 @@
     <meta property="og:type" content="article" />
     <meta property="og:url" content="https://tokenprovider.store/en/glossary/what-is-claude-relay.html" />
     <meta property="og:title" content="What Is a Claude API Proxy?" />
-    <meta property="og:description" content="A plain-English explainer of how Claude API proxies (relays, gateways) work and why they're cheaper." />
+    <meta property="og:description" content="A plain-English explainer of how Claude API proxies (relays, gateways) work and when to use one." />
     <meta property="og:image" content="https://tokenprovider.store/logo.png" />
     <meta property="og:site_name" content="TokenProvider" />
     <meta property="og:locale" content="en_US" />
 
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="What Is a Claude API Proxy?" />
-    <meta name="twitter:description" content="A plain-English explainer of how Claude API proxies (relays, gateways) work and why they're cheaper." />
+    <meta name="twitter:description" content="A plain-English explainer of how Claude API proxies (relays, gateways) work and when to use one." />
     <meta name="twitter:image" content="https://tokenprovider.store/logo.png" />
 
     <script type="application/ld+json">
@@ -38,7 +38,7 @@
         "Claude API Relay",
         "Claude API Gateway"
       ],
-      "description": "A service that forwards developer API requests to Anthropic's Claude through a pool of upstream accounts, offering pay-as-you-go pricing below official list rates.",
+      "description": "A service that forwards developer API requests to Anthropic's Claude, offering pay-as-you-go pricing and one key for multiple models.",
       "inDefinedTermSet": "https://tokenprovider.store/en/glossary/",
       "inLanguage": "en",
       "url": "https://tokenprovider.store/en/glossary/what-is-claude-relay.html"
@@ -124,51 +124,45 @@
           <p class="seo-lede">
             If you've searched "cheap Claude API" or "Claude API alternatives", you've probably
             seen the terms <em>proxy</em>, <em>relay</em>, or <em>gateway</em>. Here's what they
-            mean, how they work, why they're cheaper than paying Anthropic directly, and how to
-            pick a trustworthy one.
+            mean, how they work, how their pay-as-you-go pricing differs from paying Anthropic
+            directly, and how to pick a trustworthy one.
           </p>
 
           <div class="seo-tldr">
             <p><strong>Definition:</strong> A Claude API proxy is a service that sits between you
-            and Anthropic, forwarding your requests through a pool of upstream accounts.
-            Pooling + pay-as-you-go billing gets you a lower per-token price and more stable
-            availability than any single direct account.</p>
+            and Anthropic, forwarding your requests to the model provider. Pay-as-you-go billing and
+            one key for multiple models replace a separate subscription per vendor.</p>
           </div>
 
           <h2>An analogy</h2>
           <p>
-            Think of Anthropic as a mobile carrier selling monthly plans. Your personal usage is
-            100 minutes a month, but the cheapest plan is 200 minutes — you're paying for 100
-            unused minutes every month.
+            Think of it like a payment gateway or a CDN: instead of integrating with every provider
+            separately, you point your app at one endpoint that handles the routing behind the scenes.
           </p>
           <p>
-            A proxy is the "reseller" who buys dozens of plans from the carrier, pools unused
-            minutes across all of them, and sells <strong>only what you actually use</strong>,
-            billed by the minute.
+            A Claude API gateway works the same way — one OpenAI-compatible base URL and one key in
+            front of Claude, ChatGPT, and Gemini, with usage <strong>metered per request</strong>
+            instead of a flat monthly plan.
           </p>
           <p>
-            Swap "minutes" for "tokens" and "monthly plan" for "Anthropic subscription" — that's
-            what a Claude API proxy does.
+            You write to one API; the gateway forwards each call to the right model and bills only
+            the tokens you actually use.
           </p>
 
-          <h2>How does it actually save money?</h2>
+          <h2>Where the cost differences come from</h2>
           <ol>
             <li>
-              <strong>Account pooling</strong>: the proxy operates many upstream accounts (often
-              hundreds). Each request is routed to the most idle one right now.
+              <strong>Pay-as-you-go</strong>: you're billed per token actually used instead of a
+              flat monthly fee, so part-time or bursty usage doesn't pay for idle capacity.
             </li>
             <li>
-              <strong>Valley-filling</strong>: nights and weekends have spare capacity on
-              per-account rate limits. Selling that spare capacity to other developers turns
-              sunk cost into revenue.
+              <strong>Volume pricing</strong>: a large operator can reach tiered/volume rates that
+              individual accounts can't, and pass some of that through.
             </li>
             <li>
-              <strong>Bulk pricing</strong>: a big operator can access team/enterprise rates that
-              individuals can't. You get the discount through the proxy.
-            </li>
-            <li>
-              <strong>Cache reuse</strong>: when many users send similar long system prompts,
-              upstream prompt caches hit more often, cutting input cost dramatically.
+              <strong>Prompt-cache reuse</strong>: caching stable system prompts and context cuts
+              input cost on repeated calls — often the single biggest lever (see the
+              <a href="/en/tools/llm-api-cost-calculator.html">cost calculator</a>).
             </li>
           </ol>
 
@@ -201,7 +195,7 @@ client = anthropic.Anthropic(
                 </tr>
                 <tr>
                   <td><strong>Managed service (e.g. TokenProvider)</strong></td>
-                  <td>Operator runs the pool, risk, reliability; you pay per use</td>
+                  <td>Operator runs the infrastructure, routing, and reliability; you pay per use</td>
                   <td>Pick a reputable one — some fly-by-night operators disappear</td>
                 </tr>
                 <tr>
@@ -219,7 +213,7 @@ client = anthropic.Anthropic(
             <li><strong>Pool-to-user ratio</strong>: too many users per account means throttling</li>
             <li><strong>Docs + support</strong>: slow docs = slow ops when things break</li>
             <li><strong>Price transparency</strong>: per-token billing with detailed logs beats "unlimited for $X" gimmicks</li>
-            <li><strong>Data policy</strong>: legitimate proxies don't log prompt content, only metadata for billing</li>
+            <li><strong>Data policy</strong>: look for a clear, published statement on what is and isn't logged</li>
           </ul>
 
           <h2>Proxy vs direct: tradeoffs</h2>
@@ -274,16 +268,16 @@ client = anthropic.Anthropic(
           <h2>FAQ</h2>
           <div class="seo-faq">
             <div class="seo-faq-item">
-              <h3>Is using a proxy legal?</h3>
-              <p>Proxies operate as commercial resellers — legally a standard agency relationship. Reputable operators respect upstream terms. Sketchy ones don't; avoid them.</p>
+              <h3>Is a gateway right for production?</h3>
+              <p>For non-regulated workloads, a reputable gateway with failover and a status page is fine. If you need a vendor contract, an SLA, or a BAA for regulated data, use the direct API. TokenProvider is an independent third party, not affiliated with Anthropic.</p>
             </div>
             <div class="seo-faq-item">
-              <h3>Why can it be cheaper than Anthropic's own pay-as-you-go?</h3>
-              <p>The "waste" of unused subscription capacity is what's being recycled. Many accounts paying for unused quota = pool surplus = lower unit cost for buyers.</p>
+              <h3>How does pay-as-you-go pricing work?</h3>
+              <p>You pay only for the tokens you actually send — no flat subscription you partly waste — plus any volume pricing and prompt-cache savings on the upstream side.</p>
             </div>
             <div class="seo-faq-item">
-              <h3>Can the proxy see my prompts?</h3>
-              <p>Legitimate proxies don't log prompt bodies — only request metadata for billing. That said, don't feed any LLM (proxy or direct) secrets like API keys or credentials.</p>
+              <h3>Can the gateway see my prompts?</h3>
+              <p>A gateway can technically see the requests it forwards. Check the provider's data policy before sending sensitive content, and never feed any LLM (gateway or direct) secrets like API keys or credentials.</p>
             </div>
             <div class="seo-faq-item">
               <h3>Is a proxy slower?</h3>
@@ -316,7 +310,7 @@ client = anthropic.Anthropic(
           <a href="/login">Log in</a> ·
           <a href="/register">Sign up</a>
         </p>
-        <p>© TokenProvider · Claude / Claude Code / ChatGPT API gateway</p>
+        <p>© TokenProvider · Independent third-party Claude / Claude Code / ChatGPT / Gemini gateway · Not affiliated with Anthropic, OpenAI, or Google</p>
       </div>
     </footer>
   </body>

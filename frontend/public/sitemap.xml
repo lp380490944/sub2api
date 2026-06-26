@@ -58,6 +58,14 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://tokenprovider.store/en/compare/openrouter-vs-direct-api-vs-proxy.html</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://tokenprovider.store/en/compare/openrouter-vs-direct-api-vs-proxy.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://tokenprovider.store/en/compare/openrouter-vs-direct-api-vs-proxy.html"/>
+    <lastmod>2026-06-26</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
     <loc>https://tokenprovider.store/en/guides/claude-code-setup.html</loc>
     <xhtml:link rel="alternate" hreflang="en" href="https://tokenprovider.store/en/guides/claude-code-setup.html"/>
     <xhtml:link rel="alternate" hreflang="zh-CN" href="https://tokenprovider.store/guides/claude-code-setup.html"/>
@@ -81,6 +89,38 @@
     <lastmod>2026-05-08</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://tokenprovider.store/en/guides/roo-code-claude-api.html</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://tokenprovider.store/en/guides/roo-code-claude-api.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://tokenprovider.store/en/guides/roo-code-claude-api.html"/>
+    <lastmod>2026-06-26</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://tokenprovider.store/en/guides/claude-api-429-rate-limit-fix.html</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://tokenprovider.store/en/guides/claude-api-429-rate-limit-fix.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://tokenprovider.store/en/guides/claude-api-429-rate-limit-fix.html"/>
+    <lastmod>2026-06-26</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://tokenprovider.store/en/guides/cursor-token-usage-reduce.html</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://tokenprovider.store/en/guides/cursor-token-usage-reduce.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://tokenprovider.store/en/guides/cursor-token-usage-reduce.html"/>
+    <lastmod>2026-06-26</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://tokenprovider.store/en/tools/llm-api-cost-calculator.html</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://tokenprovider.store/en/tools/llm-api-cost-calculator.html"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://tokenprovider.store/en/tools/llm-api-cost-calculator.html"/>
+    <lastmod>2026-06-26</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.85</priority>
   </url>
   <url>
     <loc>https://tokenprovider.store/en/examples/claude-api-python.html</loc>
