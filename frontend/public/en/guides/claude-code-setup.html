@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/png" href="/logo.png" />
 
-    <title>Claude Code Setup with a Cheap Claude API (2026 guide) | TokenProvider</title>
-    <meta name="description" content="Configure Claude Code CLI with TokenProvider in 5 minutes. Point ANTHROPIC_BASE_URL at the proxy, pay per token, save 50%+ vs the official subscription. Includes error fixes." />
+    <title>Claude Code Setup with a Custom Claude API Endpoint (2026 guide) | TokenProvider</title>
+    <meta name="description" content="Configure Claude Code CLI with TokenProvider in 5 minutes. Point ANTHROPIC_BASE_URL at one gateway, pay per token with no subscription, and access Claude, GPT, and Gemini. Includes error fixes." />
     <meta name="keywords" content="claude code setup, claude code proxy, ANTHROPIC_BASE_URL, cheap claude api, claude code cli, claude code configuration" />
     <meta name="robots" content="index,follow" />
     <meta name="theme-color" content="#14b8a6" />
@@ -18,15 +18,15 @@
 
     <meta property="og:type" content="article" />
     <meta property="og:url" content="https://tokenprovider.store/en/guides/claude-code-setup.html" />
-    <meta property="og:title" content="Claude Code Setup with a Cheap Claude API" />
-    <meta property="og:description" content="Point ANTHROPIC_BASE_URL at TokenProvider in 5 minutes. Save 50%+ vs the official subscription." />
+    <meta property="og:title" content="Claude Code Setup with a Custom Claude API Endpoint" />
+    <meta property="og:description" content="Point ANTHROPIC_BASE_URL at TokenProvider in 5 minutes. Pay per token, no subscription." />
     <meta property="og:image" content="https://tokenprovider.store/logo.png" />
     <meta property="og:site_name" content="TokenProvider" />
     <meta property="og:locale" content="en_US" />
 
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Claude Code Setup with a Cheap Claude API" />
-    <meta name="twitter:description" content="Point ANTHROPIC_BASE_URL at TokenProvider in 5 minutes. Save 50%+ vs the official subscription." />
+    <meta name="twitter:title" content="Claude Code Setup with a Custom Claude API Endpoint" />
+    <meta name="twitter:description" content="Point ANTHROPIC_BASE_URL at TokenProvider in 5 minutes. Pay per token, no subscription." />
     <meta name="twitter:image" content="https://tokenprovider.store/logo.png" />
 
     <script type="application/ld+json">
@@ -116,12 +116,12 @@
     <main>
       <div class="seo-container">
         <article>
-          <h1>Claude Code Setup with a Cheap Claude API</h1>
+          <h1>Claude Code Setup with a Custom Claude API Endpoint</h1>
           <p class="seo-lede">
             Claude Code's official subscription is a flat monthly fee that adds up fast if you
-            use it daily. Point <code>ANTHROPIC_BASE_URL</code> at TokenProvider instead, pay per
-            token actually used, and <strong>typically save 50%+</strong>. Works with Sonnet 4,
-            Opus, and Haiku. 5 minutes end-to-end.
+            use it daily. Point <code>ANTHROPIC_BASE_URL</code> at TokenProvider instead and pay per
+            token actually used — metered billing with no subscription, which for daily use usually
+            comes out cheaper. Works with Sonnet 4, Opus, and Haiku. 5 minutes end-to-end.
           </p>
 
           <div class="seo-tldr">
@@ -249,16 +249,16 @@ source .env && claude</code></pre>
           <p>You can create multiple keys under the same TokenProvider account — each with its own
           billing view.</p>
 
-          <h2>Why a proxy is cheaper than a subscription</h2>
+          <h2>Pay-per-token vs a flat subscription</h2>
           <p>
-            Claude Code's official plan is a flat fee whether you use it all or not. A proxy pools
-            many subscriptions and bills by the token you actually consume — no waste on idle
-            months, no throttling on heavy months. Full breakdown:
+            Claude Code's official plan is a flat fee whether you use it all or not. A metered
+            gateway bills by the token you actually consume — no waste on idle months, no throttling
+            on heavy months. Full breakdown:
             <a href="/en/compare/claude-code-relay-vs-subscription.html">Claude Code Proxy vs Official Subscription</a>.
           </p>
 
           <section class="seo-cta-block">
-            <h2 class="seo-mt-0">Grab a key and cut your Claude Code bill in half</h2>
+            <h2 class="seo-mt-0">Grab a key and pay per token in Claude Code</h2>
             <p>1-minute signup, $1 minimum top-up, pay per token, cancel anytime.</p>
             <a class="seo-btn-cta" href="/register">Sign up free →</a>
             <a class="seo-btn-ghost" href="/login">Already a member</a>
@@ -288,8 +288,9 @@ source .env && claude</code></pre>
           <section class="seo-related">
             <h2>Related guides</h2>
             <ul class="seo-related-list">
-              <li><a href="/en/guides/cursor-claude-proxy.html"><strong>Cursor with Cheap Claude API</strong><span>IDE integration</span></a></li>
-              <li><a href="/en/guides/cline-cheap-claude.html"><strong>Cline with Cheap Claude API</strong><span>VS Code agent</span></a></li>
+              <li><a href="/en/guides/cursor-claude-proxy.html"><strong>Cursor + Claude API Proxy</strong><span>IDE integration</span></a></li>
+              <li><a href="/en/guides/cline-cheap-claude.html"><strong>Cline + Custom Claude API</strong><span>VS Code agent</span></a></li>
+              <li><a href="/en/guides/roo-code-claude-api.html"><strong>Roo Code Custom LLM Setup</strong><span>Per-mode models</span></a></li>
               <li><a href="/en/examples/claude-api-python.html"><strong>Claude API Python Example</strong><span>Programmatic use</span></a></li>
               <li><a href="/en/glossary/what-is-claude-code.html"><strong>What Is Claude Code?</strong><span>Primer</span></a></li>
             </ul>
@@ -306,7 +307,7 @@ source .env && claude</code></pre>
           <a href="/login">Log in</a> ·
           <a href="/register">Sign up</a>
         </p>
-        <p>© TokenProvider · Claude / Claude Code / ChatGPT API gateway</p>
+        <p>© TokenProvider · Independent third-party Claude / Claude Code / ChatGPT / Gemini gateway · Not affiliated with Anthropic, OpenAI, or Google</p>
       </div>
     </footer>
   </body>

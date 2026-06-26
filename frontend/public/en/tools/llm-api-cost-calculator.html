@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/png" href="/logo.png" />
+
+    <title>LLM API Cost Calculator: Claude, GPT &amp; Gemini Pricing (2026) | TokenProvider</title>
+    <meta name="description" content="Free interactive LLM API cost calculator. Enter your tokens-per-request and daily volume to compare per-request, per-day, and monthly cost across Claude, GPT, and Gemini. Editable list prices, prompt-cache modelling." />
+    <meta name="keywords" content="llm api cost calculator, claude api pricing calculator, claude api cost, gpt-4o pricing calculator, gemini api cost, token cost calculator, ai api price comparison" />
+    <meta name="robots" content="index,follow" />
+    <meta name="theme-color" content="#14b8a6" />
+
+    <link rel="canonical" href="https://tokenprovider.store/en/tools/llm-api-cost-calculator.html" />
+    <link rel="alternate" hreflang="en" href="https://tokenprovider.store/en/tools/llm-api-cost-calculator.html" />
+    <link rel="alternate" hreflang="x-default" href="https://tokenprovider.store/en/tools/llm-api-cost-calculator.html" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://tokenprovider.store/en/tools/llm-api-cost-calculator.html" />
+    <meta property="og:title" content="LLM API Cost Calculator — Claude, GPT &amp; Gemini (2026)" />
+    <meta property="og:description" content="Compare per-request, per-day, and monthly API cost across Claude, GPT, and Gemini. Editable prices, prompt-cache modelling." />
+    <meta property="og:image" content="https://tokenprovider.store/logo.png" />
+    <meta property="og:site_name" content="TokenProvider" />
+    <meta property="og:locale" content="en_US" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="LLM API Cost Calculator — Claude, GPT &amp; Gemini (2026)" />
+    <meta name="twitter:description" content="Compare per-request, per-day, and monthly API cost across Claude, GPT, and Gemini." />
+    <meta name="twitter:image" content="https://tokenprovider.store/logo.png" />
+
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "LLM API Cost Calculator",
+      "url": "https://tokenprovider.store/en/tools/llm-api-cost-calculator.html",
+      "applicationCategory": "DeveloperApplication",
+      "operatingSystem": "Web",
+      "inLanguage": "en",
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+      "description": "Interactive calculator that estimates per-request, per-day, and monthly cost for Claude, GPT, and Gemini APIs from your token volumes, with editable prices and prompt-cache modelling.",
+      "publisher": { "@type": "Organization", "name": "TokenProvider", "url": "https://tokenprovider.store/" }
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "How is API cost calculated?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Cost per request = (input tokens × input price + output tokens × output price) ÷ 1,000,000. Multiply by requests per day, then by 30 for a monthly estimate. Prompt caching reduces the input portion on cache hits."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Are the prices accurate?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "The prices are editable estimates as of June 2026 and provided for convenience. Provider pricing changes often — edit any rate inline, and verify against the official Anthropic, OpenAI, and Google pricing pages."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Does prompt caching really lower cost?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. On a cache hit, the cached input is billed at roughly 10% of the base input rate, so repetitive context (system prompts, project files) costs far less. The cache-hit slider models this."
+          }
+        }
+      ]
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "TokenProvider", "item": "https://tokenprovider.store/en.html" },
+        { "@type": "ListItem", "position": 2, "name": "LLM API cost calculator", "item": "https://tokenprovider.store/en/tools/llm-api-cost-calculator.html" }
+      ]
+    }
+    </script>
+
+    <link rel="stylesheet" href="/assets/seo.css" />
+    <style>
+      .calc { margin: 1.5rem 0 1rem; }
+      .calc-grid {
+        display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        background: rgba(20,184,166,0.06); border: 1px solid rgba(20,184,166,0.25);
+        border-radius: 14px; padding: 1.25rem;
+      }
+      .calc-field { display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.9rem; }
+      .calc-field label { font-weight: 600; }
+      .calc-field input[type="number"] {
+        padding: 0.55rem 0.7rem; border: 1px solid rgba(120,120,120,0.35);
+        border-radius: 8px; font-size: 1rem; width: 100%; background: rgba(255,255,255,0.9);
+        color: #0f172a;
+      }
+      .calc-field input[type="range"] { width: 100%; accent-color: #14b8a6; }
+      .calc-cache-val { font-weight: 700; color: #0d9488; }
+      .calc-table-wrap { overflow-x: auto; margin-top: 1.25rem; }
+      table.calc-table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+      table.calc-table th, table.calc-table td {
+        padding: 0.6rem 0.7rem; text-align: right; border-bottom: 1px solid rgba(120,120,120,0.18);
+        white-space: nowrap;
+      }
+      table.calc-table th:first-child, table.calc-table td:first-child { text-align: left; }
+      table.calc-table th { font-weight: 700; }
+      .calc-vendor { display: block; font-size: 0.72rem; opacity: 0.65; font-weight: 400; }
+      .calc-rate {
+        width: 5.5rem; padding: 0.35rem 0.45rem; border: 1px solid rgba(120,120,120,0.35);
+        border-radius: 6px; font-size: 0.9rem; text-align: right; background: rgba(255,255,255,0.9);
+        color: #0f172a;
+      }
+      .calc-out { font-variant-numeric: tabular-nums; }
+      .calc-strong { font-weight: 700; }
+      .calc-best { color: #0d9488; background: rgba(20,184,166,0.12); border-radius: 6px; }
+      .calc-note { font-size: 0.85rem; opacity: 0.8; margin-top: 0.75rem; }
+      @media (prefers-color-scheme: dark) {
+        .calc-grid { background: rgba(20,184,166,0.1); }
+        .calc-field input[type="number"], .calc-rate { background: rgba(15,23,42,0.6); color: #f1f5f9; border-color: rgba(148,163,184,0.3); }
+      }
+      @media (max-width: 640px) {
+        table.calc-table thead { display: none; }
+        table.calc-table tr { display: grid; grid-template-columns: 1fr 1fr; gap: 0.25rem 0.75rem;
+          padding: 0.6rem 0; border-bottom: 1px solid rgba(120,120,120,0.2); }
+        table.calc-table td { border: 0; padding: 0.15rem 0; white-space: normal; }
+        table.calc-table td::before { content: attr(data-label); display: block; font-size: 0.7rem; opacity: 0.6; }
+        table.calc-table td:first-child { grid-column: 1 / -1; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="seo-bg-decor"></div>
+
+    <header class="seo-header">
+      <div class="seo-container-wide">
+        <nav class="seo-nav">
+          <a class="seo-logo" href="/en.html">
+            <img src="/logo.png" alt="TokenProvider logo" width="36" height="36" />
+            <span class="seo-logo-text">TokenProvider</span>
+          </a>
+          <div class="seo-nav-links">
+            <a class="seo-nav-link" href="/en.html">Home</a>
+            <a class="seo-nav-link" href="/login">Log in</a>
+            <a class="seo-btn-primary" href="/register">Sign up →</a>
+          </div>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <div class="seo-container">
+        <article>
+          <h1>LLM API Cost Calculator</h1>
+          <p class="seo-lede">
+            Estimate what Claude, GPT, and Gemini will actually cost for your workload. Enter your
+            average tokens per request and daily volume — the table updates live with per-request,
+            per-day, and monthly cost for every model. Every price is editable.
+          </p>
+
+          <section class="calc" aria-label="Cost calculator">
+            <div class="calc-grid">
+              <div class="calc-field">
+                <label for="inTok">Avg input tokens / request</label>
+                <input id="inTok" type="number" inputmode="numeric" min="0" step="100" value="2000" />
+              </div>
+              <div class="calc-field">
+                <label for="outTok">Avg output tokens / request</label>
+                <input id="outTok" type="number" inputmode="numeric" min="0" step="100" value="500" />
+              </div>
+              <div class="calc-field">
+                <label for="reqDay">Requests / day</label>
+                <input id="reqDay" type="number" inputmode="numeric" min="0" step="10" value="200" />
+              </div>
+              <div class="calc-field">
+                <label for="cachePct">Prompt-cache hit (input) — <span id="cacheVal" class="calc-cache-val">0%</span></label>
+                <input id="cachePct" type="range" min="0" max="100" step="5" value="0" />
+              </div>
+            </div>
+
+            <div class="calc-table-wrap">
+              <table class="calc-table">
+                <thead>
+                  <tr>
+                    <th>Model</th>
+                    <th>Input $/M</th>
+                    <th>Output $/M</th>
+                    <th>$ / request</th>
+                    <th>$ / day</th>
+                    <th>$ / month</th>
+                  </tr>
+                </thead>
+                <tbody id="calcRows"><!-- generated by /assets/cost-calculator.js --></tbody>
+              </table>
+            </div>
+            <p class="calc-note">
+              Prices are <strong>editable estimates as of June 2026</strong> (USD per 1M tokens) —
+              edit any cell to match what you actually pay. Always confirm against the official
+              <a href="https://www.anthropic.com/pricing" rel="nofollow noopener">Anthropic</a>,
+              <a href="https://openai.com/api/pricing/" rel="nofollow noopener">OpenAI</a>, and
+              <a href="https://ai.google.dev/pricing" rel="nofollow noopener">Google</a> pricing pages.
+              The cheapest monthly total is highlighted.
+            </p>
+          </section>
+
+          <h2>How the math works</h2>
+          <p>The formula is simple — the hard part is knowing your real token counts:</p>
+          <pre><code>cost per request = (input_tokens × input_price + output_tokens × output_price) ÷ 1,000,000
+cost per month   = cost per request × requests_per_day × 30</code></pre>
+          <p>Two things people consistently underestimate: <strong>output tokens are far more
+          expensive than input</strong> (often 4–5×), and <strong>agentic tools resend context every
+          turn</strong>, so a single "task" can be dozens of requests. If your real usage is higher
+          than expected, see <a href="/en/guides/cursor-token-usage-reduce.html">reducing Cursor token usage</a>.</p>
+
+          <h2>Why prompt caching matters</h2>
+          <p>If you send the same system prompt or project context repeatedly, prompt caching bills
+          the cached portion at roughly <strong>10% of the input rate</strong> on a cache hit. Drag
+          the cache-hit slider up to see the effect — for repetitive workloads it's often the single
+          biggest lever on your bill, bigger than switching models.</p>
+
+          <section class="seo-cta-block">
+            <h2 class="seo-mt-0">See your <em>actual</em> per-request cost — one endpoint, every model</h2>
+            <p>This tool estimates list prices. TokenProvider logs the real tokens and cost of every
+            call across Claude, GPT, and Gemini from a single key, so you can stop guessing.</p>
+            <a class="seo-btn-cta" href="/register">Sign up free →</a>
+            <a class="seo-btn-ghost" href="/login">Already a member</a>
+          </section>
+
+          <h2>FAQ</h2>
+          <div class="seo-faq">
+            <div class="seo-faq-item">
+              <h3>How is API cost calculated?</h3>
+              <p>Cost per request = (input tokens × input price + output tokens × output price) ÷
+              1,000,000, then × requests/day × 30 for a month. Caching lowers the input portion on hits.</p>
+            </div>
+            <div class="seo-faq-item">
+              <h3>Are these prices current?</h3>
+              <p>They're editable estimates as of June 2026. Provider pricing moves often — edit any
+              rate inline and verify against the official pricing pages linked above.</p>
+            </div>
+            <div class="seo-faq-item">
+              <h3>How do I find my real token counts?</h3>
+              <p>Check a per-request usage log. Most workloads have far higher input tokens than people
+              guess because of system prompts and resent context.</p>
+            </div>
+          </div>
+
+          <section class="seo-related">
+            <h2>Related guides</h2>
+            <ul class="seo-related-list">
+              <li><a href="/en/guides/cursor-token-usage-reduce.html"><strong>Reduce Cursor Token Usage</strong><span>Cut context bloat</span></a></li>
+              <li><a href="/en/guides/claude-api-429-rate-limit-fix.html"><strong>Fix Anthropic API 429s</strong><span>Rate limits explained</span></a></li>
+              <li><a href="/en/compare/claude-vs-chatgpt-api.html"><strong>Claude vs ChatGPT API</strong><span>Pick the right model</span></a></li>
+              <li><a href="/en/guides/claude-code-setup.html"><strong>Claude Code Setup</strong><span>Custom endpoint</span></a></li>
+            </ul>
+          </section>
+        </article>
+      </div>
+    </main>
+
+    <footer class="seo-footer">
+      <div class="seo-container">
+        <p>
+          <a href="/en.html">Home</a> ·
+          <a href="/login">Log in</a> ·
+          <a href="/register">Sign up</a>
+        </p>
+        <p>© TokenProvider · Independent third-party Claude / Claude Code / ChatGPT / Gemini gateway · Not affiliated with Anthropic, OpenAI, or Google</p>
+      </div>
+    </footer>
+
+    <script src="/assets/cost-calculator.js"></script>
+  </body>
+</html>

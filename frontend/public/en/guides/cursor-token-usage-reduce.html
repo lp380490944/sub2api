@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/png" href="/logo.png" />
+
+    <title>Reduce Cursor Token Usage: Stop Claude Token Bloat in Your IDE (2026) | TokenProvider</title>
+    <meta name="description" content="Why Cursor burns so many Claude tokens — full-context resends, autocomplete, and apply calls — and how to cut it: .cursorignore, selective @-mentions, smaller autocomplete models, fresh chats, and per-request usage visibility." />
+    <meta name="keywords" content="cursor token usage, reduce cursor api cost, cursor too many tokens, claude token bloat cursor, cursor context too large, cursor sonnet cost" />
+    <meta name="robots" content="index,follow" />
+    <meta name="theme-color" content="#14b8a6" />
+
+    <link rel="canonical" href="https://tokenprovider.store/en/guides/cursor-token-usage-reduce.html" />
+    <link rel="alternate" hreflang="en" href="https://tokenprovider.store/en/guides/cursor-token-usage-reduce.html" />
+    <link rel="alternate" hreflang="x-default" href="https://tokenprovider.store/en/guides/cursor-token-usage-reduce.html" />
+
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content="https://tokenprovider.store/en/guides/cursor-token-usage-reduce.html" />
+    <meta property="og:title" content="Reduce Cursor Token Usage — Stop Claude Token Bloat (2026)" />
+    <meta property="og:description" content="Why Cursor burns Claude tokens and how to cut it: .cursorignore, selective context, smaller autocomplete models, and usage visibility." />
+    <meta property="og:image" content="https://tokenprovider.store/logo.png" />
+    <meta property="og:site_name" content="TokenProvider" />
+    <meta property="og:locale" content="en_US" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Reduce Cursor Token Usage — Stop Claude Token Bloat (2026)" />
+    <meta name="twitter:description" content="Why Cursor burns Claude tokens and how to cut it." />
+    <meta name="twitter:image" content="https://tokenprovider.store/logo.png" />
+
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "TechArticle",
+      "headline": "Reduce Cursor Token Usage: Stop Claude Token Bloat in Your IDE",
+      "description": "Why Cursor consumes large numbers of Claude tokens and the concrete settings that reduce it.",
+      "inLanguage": "en",
+      "datePublished": "2026-06-26",
+      "dateModified": "2026-06-26",
+      "author": { "@type": "Organization", "name": "TokenProvider" },
+      "publisher": {
+        "@type": "Organization",
+        "name": "TokenProvider",
+        "logo": { "@type": "ImageObject", "url": "https://tokenprovider.store/logo.png" }
+      }
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "Why does Cursor use so many tokens?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Cursor resends context on every turn, autocomplete fires many small requests, and each apply is a second model call. Large @-mentions and a big indexed codebase inflate the input tokens sent with each request."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Does a smaller model for autocomplete actually save money?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. Autocomplete is the highest-frequency call. Using a fast, cheap model for completions and reserving Sonnet or Opus for Composer edits removes the biggest source of token bloat."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How do I see exactly where my Cursor tokens go?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Use a metered endpoint with a per-request usage log. Each Cursor call shows the model, input/output tokens, and cost, so you can see whether autocomplete, Composer, or apply is driving spend."
+          }
+        }
+      ]
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "TokenProvider", "item": "https://tokenprovider.store/en.html" },
+        { "@type": "ListItem", "position": 2, "name": "Reduce Cursor token usage", "item": "https://tokenprovider.store/en/guides/cursor-token-usage-reduce.html" }
+      ]
+    }
+    </script>
+
+    <link rel="stylesheet" href="/assets/seo.css" />
+  </head>
+  <body>
+    <div class="seo-bg-decor"></div>
+
+    <header class="seo-header">
+      <div class="seo-container-wide">
+        <nav class="seo-nav">
+          <a class="seo-logo" href="/en.html">
+            <img src="/logo.png" alt="TokenProvider logo" width="36" height="36" />
+            <span class="seo-logo-text">TokenProvider</span>
+          </a>
+          <div class="seo-nav-links">
+            <a class="seo-nav-link" href="/en.html">Home</a>
+            <a class="seo-nav-link" href="/login">Log in</a>
+            <a class="seo-btn-primary" href="/register">Sign up →</a>
+          </div>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <div class="seo-container">
+        <article>
+          <h1>Reduce Cursor Token Usage</h1>
+          <p class="seo-lede">
+            If Cursor is burning through Claude tokens faster than you expect, it's almost always
+            context bloat — not the model being expensive. Here's where the tokens actually go and
+            the settings that cut spend without slowing you down.
+          </p>
+
+          <div class="seo-tldr">
+            <p><strong>Biggest wins:</strong> add a <code>.cursorignore</code>, stop @-mentioning
+            whole folders, use a fast cheap model for autocomplete (reserve Sonnet/Opus for
+            Composer), and start fresh chats often. Then watch a per-request usage log to confirm
+            what's actually costing you.</p>
+          </div>
+
+          <h2>Where Cursor's tokens go</h2>
+          <div class="seo-table-wrap">
+            <table class="seo-table">
+              <thead><tr><th>Source</th><th>Why it adds up</th></tr></thead>
+              <tbody>
+                <tr><td>Context resend</td><td>Every Composer turn resends the conversation + attached files as input tokens</td></tr>
+                <tr><td>Autocomplete (Tab)</td><td>Highest-frequency call — many tiny requests across a day</td></tr>
+                <tr><td>Apply diff</td><td>A second model call to apply each suggested edit</td></tr>
+                <tr><td>Large @-mentions</td><td>@-folder or @-codebase can attach far more than you need</td></tr>
+                <tr><td>Indexed codebase</td><td>Big/generated files inflate retrieved context</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h2>Six fixes, biggest first</h2>
+          <ol class="seo-steps">
+            <li>
+              <h3>Add a <code>.cursorignore</code></h3>
+              <p>Exclude generated and heavy directories so they never enter context or the index:</p>
+<pre><code># .cursorignore
+node_modules/
+dist/
+build/
+.next/
+*.lock
+*.min.js
+coverage/</code></pre>
+            </li>
+            <li>
+              <h3>Be surgical with @-mentions</h3>
+              <p>Attach the specific files you're working on, not <code>@codebase</code> or a whole
+              <code>@folder</code>. The model rarely needs the entire tree to edit one module.</p>
+            </li>
+            <li>
+              <h3>Split autocomplete from Composer</h3>
+              <p>Use a fast, cheap model for Tab completions and keep Sonnet/Opus for Composer edits.
+              Autocomplete frequency is what quietly dominates a day's spend.</p>
+            </li>
+            <li>
+              <h3>Start fresh chats often</h3>
+              <p>A long Composer thread resends its entire history every turn. When you switch tasks,
+              open a new chat so you're not paying to resend stale context.</p>
+            </li>
+            <li>
+              <h3>Right-size the model per task</h3>
+              <p>Use Haiku/GPT-4o-mini for lookups and explanations, Sonnet for normal edits, Opus
+              only for hard multi-file refactors. Most edits don't need the biggest model.</p>
+            </li>
+            <li>
+              <h3>Measure, then trim</h3>
+              <p>Route Cursor through a metered endpoint and read the per-request log: model, tokens,
+              cost. Once you can see whether autocomplete, Composer, or apply is the culprit, the fix
+              is obvious. Setup: <a href="/en/guides/cursor-claude-proxy.html">Cursor + Claude API proxy</a>.</p>
+            </li>
+          </ol>
+
+          <h2>Bloat that also causes 429s</h2>
+          <p>The same oversized context that runs up tokens also pushes you into per-minute input-token
+          limits. If you're seeing rate-limit errors alongside high spend, see
+          <a href="/en/guides/claude-api-429-rate-limit-fix.html">fixing Anthropic API 429s</a>.</p>
+
+          <h2>FAQ</h2>
+          <div class="seo-faq">
+            <div class="seo-faq-item">
+              <h3>Why does Cursor use so many tokens?</h3>
+              <p>It resends context every turn, autocomplete fires constantly, and each apply is a
+              second call. Large @-mentions and a big indexed codebase inflate every request.</p>
+            </div>
+            <div class="seo-faq-item">
+              <h3>Will a smaller autocomplete model hurt quality?</h3>
+              <p>Rarely — completions are short and local. The quality that matters lives in Composer
+              edits, which you keep on Sonnet or Opus.</p>
+            </div>
+            <div class="seo-faq-item">
+              <h3>How do I see where my tokens go?</h3>
+              <p>Use a metered endpoint with a per-request usage log so each Cursor call shows model,
+              tokens, and cost — then trim the biggest line item.</p>
+            </div>
+          </div>
+
+          <section class="seo-cta-block">
+            <h2 class="seo-mt-0">See every Cursor request — model, tokens, cost</h2>
+            <p>$1 minimum top-up, pay per token, cancel anytime.</p>
+            <a class="seo-btn-cta" href="/register">Sign up free →</a>
+            <a class="seo-btn-ghost" href="/login">Already a member</a>
+          </section>
+
+          <section class="seo-related">
+            <h2>Related guides</h2>
+            <ul class="seo-related-list">
+              <li><a href="/en/guides/cursor-claude-proxy.html"><strong>Cursor + Claude API Proxy</strong><span>2-minute setup</span></a></li>
+              <li><a href="/en/guides/claude-api-429-rate-limit-fix.html"><strong>Fix Anthropic API 429s</strong><span>Rate limits explained</span></a></li>
+              <li><a href="/en/tools/llm-api-cost-calculator.html"><strong>LLM API Cost Calculator</strong><span>Model up your spend</span></a></li>
+              <li><a href="/en/guides/cline-cheap-claude.html"><strong>Cline + Custom Claude API</strong><span>VS Code agent</span></a></li>
+            </ul>
+          </section>
+        </article>
+      </div>
+    </main>
+
+    <footer class="seo-footer">
+      <div class="seo-container">
+        <p>
+          <a href="/en.html">Home</a> ·
+          <a href="/login">Log in</a> ·
+          <a href="/register">Sign up</a>
+        </p>
+        <p>© TokenProvider · Independent third-party Claude / Claude Code / ChatGPT / Gemini gateway · Not affiliated with Anthropic, OpenAI, or Google</p>
+      </div>
+    </footer>
+  </body>
+</html>
