@@ -6086,6 +6086,8 @@ export default {
         rewriteMessageCacheControlModeSafe: 'Safe（推荐）— 仅在客户端无 cache_control 时注入',
         rewriteMessageCacheControlModeShadow: 'Shadow — 仅观测，不修改请求体',
         rewriteMessageCacheControlModeFull: 'Full（旧版）— 清除并重新注入代理断点',
+        clientDatelineNormalization: '客户端 dateline 归一化',
+        clientDatelineNormalizationHint: '默认开启。将 Anthropic OAuth/Setup Token 请求体中 "Today\'s date is …" 语句里的撇号与日期分隔符还原为 ASCII 撇号 + 短横线 (2026-07-01) 的规范形态，抹除某些客户端在检测到非官方 base URL 时注入的隐写指纹位。仅作用于 system prompt 与 <system-reminder> 块内，API Key 账号不受影响。',
         antigravityUserAgentVersion: 'Antigravity UA 版本',
         antigravityUserAgentVersionPlaceholder: '1.23.2',
         antigravityUserAgentVersionHint: '留空时使用 ANTIGRAVITY_USER_AGENT_VERSION 或内置默认值 1.23.2；填写后后台设置优先。',

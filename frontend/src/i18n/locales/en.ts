@@ -5944,6 +5944,8 @@ export default {
         rewriteMessageCacheControlModeSafe: 'Safe (recommended) — only inject when client has no cache_control',
         rewriteMessageCacheControlModeShadow: 'Shadow — observe only, no body modification',
         rewriteMessageCacheControlModeFull: 'Full (legacy) — strip and re-inject proxy breakpoints',
+        clientDatelineNormalization: 'Client Dateline Normalization',
+        clientDatelineNormalizationHint: 'Default on. Rewrites the "Today\'s date is …" sentence in Anthropic OAuth/Setup Token requests back to a canonical ASCII apostrophe and hyphen date format, erasing steganographic fingerprint bits some clients inject when they detect a non-official base URL. Applies to system prompts and <system-reminder> blocks only; API-Key accounts are unaffected.',
         antigravityUserAgentVersion: 'Antigravity UA Version',
         antigravityUserAgentVersionPlaceholder: '1.23.2',
         antigravityUserAgentVersionHint: 'Leave empty to use ANTIGRAVITY_USER_AGENT_VERSION or the built-in default 1.23.2; when set, the admin setting takes precedence.',
