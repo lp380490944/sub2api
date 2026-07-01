@@ -540,7 +540,7 @@ func (h *AccountHandler) Create(c *gin.Context) {
 	sanitizeExtraBaseRPM(req.Extra)
 	sanitizeExtraUpstreamPassthrough(req.Extra)
 	if err := normalizeBedrockMantleCredentials(req.Credentials); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		response.BadRequest(c, err.Error())
 		return
 	}
 
@@ -644,7 +644,7 @@ func (h *AccountHandler) Update(c *gin.Context) {
 	sanitizeExtraUpstreamPassthrough(req.Extra)
 	if len(req.Credentials) > 0 {
 		if err := normalizeBedrockMantleCredentials(req.Credentials); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			response.BadRequest(c, err.Error())
 			return
 		}
 	}

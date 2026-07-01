@@ -257,6 +257,10 @@ func (s *OpenAIGatewayService) forwardAsRawChatCompletions(
 }
 
 func (s *OpenAIGatewayService) rawChatCompletionsURL(account *Account) (string, error) {
+	if account.IsOpenAIBedrockMantle() {
+		return buildOpenAIChatCompletionsURL(account.GetOpenAIBaseURL()), nil
+	}
+
 	if account.Platform == PlatformGrok {
 		targetURL, err := xai.BuildChatCompletionsURL(account.GetGrokBaseURL())
 		if err != nil {
