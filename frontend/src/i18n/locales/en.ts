@@ -3209,6 +3209,7 @@ export default {
         gemini: 'Gemini',
         antigravity: 'Antigravity',
         kiro: 'Kiro',
+        grok: 'Grok',
       },
       types: {
         oauth: 'OAuth',
