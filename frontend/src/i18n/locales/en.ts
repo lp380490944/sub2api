@@ -3818,11 +3818,13 @@ export default {
       claudePlatformAWSWorkspaceId: 'Workspace ID',
       claudePlatformAWSWorkspaceIdHint: 'The wrkspc_... ID from AWS Console Claude Platform on AWS. It must match the selected region.',
       claudePlatformAWSWorkspaceIdRequired: 'Please enter Workspace ID',
+      bedrockAuthModeMantle: 'Bedrock Mantle (native API key)',
       bedrockApiKeyLabel: 'Bedrock API Key',
       bedrockApiKeyDesc: 'Bearer Token',
       bedrockApiKeyInput: 'API Key',
       bedrockApiKeyRequired: 'Please enter Bedrock API Key',
       bedrockApiKeyLeaveEmpty: 'Leave empty to keep current key',
+      openaiMantleToggle: 'Use AWS Bedrock Mantle endpoint',
       apiKeyIsRequired: 'API Key is required',
       leaveEmptyToKeep: 'Leave empty to keep current key',
       // Upstream type

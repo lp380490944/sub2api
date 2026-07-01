@@ -3969,11 +3969,13 @@ export default {
       claudePlatformAWSWorkspaceId: 'Workspace ID',
       claudePlatformAWSWorkspaceIdHint: '来自 AWS 控制台 Claude Platform on AWS 的 wrkspc_... ID，请与所选 Region 保持一致',
       claudePlatformAWSWorkspaceIdRequired: '请输入 Workspace ID',
+      bedrockAuthModeMantle: 'Bedrock Mantle (原生 API Key)',
       bedrockApiKeyLabel: 'Bedrock API Key',
       bedrockApiKeyDesc: 'Bearer Token 认证',
       bedrockApiKeyInput: 'API Key',
       bedrockApiKeyRequired: '请输入 Bedrock API Key',
       bedrockApiKeyLeaveEmpty: '留空以保持当前密钥',
+      openaiMantleToggle: '使用 AWS Bedrock Mantle 端点',
       apiKeyIsRequired: 'API Key 是必需的',
       leaveEmptyToKeep: '留空以保持当前密钥',
       // Upstream type

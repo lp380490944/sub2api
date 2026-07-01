@@ -1212,7 +1212,18 @@
 
       <!-- API Key input (only for apikey type, excluding Antigravity which has its own fields) -->
       <div v-if="form.type === 'apikey' && form.platform !== 'antigravity'" class="space-y-4">
-        <div>
+        <!-- OpenAI: AWS Bedrock Mantle endpoint toggle -->
+        <div v-if="form.platform === 'openai'">
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input
+              v-model="openaiBedrockMantle"
+              type="checkbox"
+              class="rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-dark-500"
+            />
+            <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('admin.accounts.openaiMantleToggle') }}</span>
+          </label>
+        </div>
+        <div v-if="!openaiBedrockMantle">
           <label class="input-label">{{ t('admin.accounts.baseUrl') }}</label>
           <input
             v-model="apiKeyBaseUrl"
@@ -1227,6 +1238,46 @@
             "
           />
           <p class="input-hint">{{ baseUrlHint }}</p>
+        </div>
+        <!-- OpenAI: AWS Bedrock Mantle region -->
+        <div v-if="openaiBedrockMantle">
+          <label class="input-label">{{ t('admin.accounts.bedrockRegion') }}</label>
+          <select v-model="openaiMantleRegion" class="input">
+            <optgroup label="US">
+              <option value="us-east-1">us-east-1 (N. Virginia)</option>
+              <option value="us-east-2">us-east-2 (Ohio)</option>
+              <option value="us-west-1">us-west-1 (N. California)</option>
+              <option value="us-west-2">us-west-2 (Oregon)</option>
+              <option value="us-gov-east-1">us-gov-east-1 (GovCloud US-East)</option>
+              <option value="us-gov-west-1">us-gov-west-1 (GovCloud US-West)</option>
+            </optgroup>
+            <optgroup label="Europe">
+              <option value="eu-west-1">eu-west-1 (Ireland)</option>
+              <option value="eu-west-2">eu-west-2 (London)</option>
+              <option value="eu-west-3">eu-west-3 (Paris)</option>
+              <option value="eu-central-1">eu-central-1 (Frankfurt)</option>
+              <option value="eu-central-2">eu-central-2 (Zurich)</option>
+              <option value="eu-south-1">eu-south-1 (Milan)</option>
+              <option value="eu-south-2">eu-south-2 (Spain)</option>
+              <option value="eu-north-1">eu-north-1 (Stockholm)</option>
+            </optgroup>
+            <optgroup label="Asia Pacific">
+              <option value="ap-northeast-1">ap-northeast-1 (Tokyo)</option>
+              <option value="ap-northeast-2">ap-northeast-2 (Seoul)</option>
+              <option value="ap-northeast-3">ap-northeast-3 (Osaka)</option>
+              <option value="ap-south-1">ap-south-1 (Mumbai)</option>
+              <option value="ap-south-2">ap-south-2 (Hyderabad)</option>
+              <option value="ap-southeast-1">ap-southeast-1 (Singapore)</option>
+              <option value="ap-southeast-2">ap-southeast-2 (Sydney)</option>
+            </optgroup>
+            <optgroup label="Canada">
+              <option value="ca-central-1">ca-central-1 (Canada)</option>
+            </optgroup>
+            <optgroup label="South America">
+              <option value="sa-east-1">sa-east-1 (São Paulo)</option>
+            </optgroup>
+          </select>
+          <p class="input-hint">{{ t('admin.accounts.bedrockRegionHint') }}</p>
         </div>
         <div>
           <label class="input-label">{{ t('admin.accounts.apiKeyRequired') }}</label>
@@ -1639,6 +1690,15 @@
               />
               <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('admin.accounts.claudePlatformAWS') }}</span>
             </label>
+            <label class="flex cursor-pointer items-center">
+              <input
+                v-model="bedrockAuthMode"
+                type="radio"
+                value="bedrock_mantle"
+                class="mr-2 text-primary-600 focus:ring-primary-500"
+              />
+              <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('admin.accounts.bedrockAuthModeMantle') }}</span>
+            </label>
           </div>
         </div>
 
@@ -1675,7 +1735,7 @@
         </template>
 
         <!-- API Key field -->
-        <div v-if="bedrockAuthMode === 'apikey' || bedrockAuthMode === 'claude_platform_aws'">
+        <div v-if="bedrockAuthMode === 'apikey' || bedrockAuthMode === 'claude_platform_aws' || bedrockAuthMode === 'bedrock_mantle'">
           <label class="input-label">{{ t('admin.accounts.bedrockApiKeyInput') }}</label>
           <input
             v-model="bedrockApiKeyValue"
@@ -1738,7 +1798,7 @@
         </div>
 
         <!-- Shared: Force Global -->
-        <div v-if="bedrockAuthMode !== 'claude_platform_aws'">
+        <div v-if="bedrockAuthMode !== 'claude_platform_aws' && bedrockAuthMode !== 'bedrock_mantle'">
           <label class="flex items-center gap-2 cursor-pointer">
             <input
               v-model="bedrockForceGlobal"
@@ -1805,7 +1865,7 @@
               + {{ t('admin.accounts.addMapping') }}
             </button>
             <!-- Bedrock Preset Mappings -->
-            <div v-if="bedrockAuthMode !== 'claude_platform_aws'" class="flex flex-wrap gap-2">
+            <div v-if="bedrockAuthMode !== 'claude_platform_aws' && bedrockAuthMode !== 'bedrock_mantle'" class="flex flex-wrap gap-2">
               <button
                 v-for="preset in bedrockPresets"
                 :key="preset.from"
@@ -3739,6 +3799,8 @@ const accountCategory = ref<'oauth-based' | 'apikey' | 'bedrock' | 'service_acco
 const addMethod = ref<AddMethod>('oauth') // For oauth-based: 'oauth' or 'setup-token'
 const apiKeyBaseUrl = ref('https://api.anthropic.com')
 const apiKeyValue = ref('')
+const openaiBedrockMantle = ref(false)
+const openaiMantleRegion = ref('eu-north-1')
 
 const syncPreviewCredentials = computed(() => {
   if (!apiKeyValue.value) return undefined
@@ -3846,7 +3908,7 @@ const antigravityPresetMappings = computed(() => getPresetMappingsByPlatform('an
 const bedrockPresets = computed(() => getPresetMappingsByPlatform('bedrock'))
 
 // Bedrock credentials
-const bedrockAuthMode = ref<'sigv4' | 'apikey' | 'claude_platform_aws'>('sigv4')
+const bedrockAuthMode = ref<'sigv4' | 'apikey' | 'claude_platform_aws' | 'bedrock_mantle'>('sigv4')
 const bedrockAccessKeyId = ref('')
 const bedrockSecretAccessKey = ref('')
 const bedrockSessionToken = ref('')
@@ -3854,6 +3916,11 @@ const bedrockRegion = ref('us-east-1')
 const bedrockForceGlobal = ref(false)
 const bedrockApiKeyValue = ref('')
 const bedrockWorkspaceId = ref('')
+watch(bedrockAuthMode, (mode) => {
+  if (mode === 'bedrock_mantle' && (bedrockRegion.value === 'us-east-1' || !bedrockRegion.value)) {
+    bedrockRegion.value = 'eu-north-1'
+  }
+})
 const vertexServiceAccountFileInput = ref<HTMLInputElement | null>(null)
 const vertexServiceAccountJson = ref('')
 const vertexProjectId = ref('')
@@ -4268,6 +4335,8 @@ watch(
       openaiAPIKeyResponsesWebSocketV2Mode.value = OPENAI_WS_MODE_OFF
       codexCLIOnlyEnabled.value = false
       codexCLIOnlyAllowClaudeCodeEnabled.value = false
+      openaiBedrockMantle.value = false
+      openaiMantleRegion.value = 'eu-north-1'
     }
     if (newPlatform !== 'anthropic') {
       anthropicPassthroughEnabled.value = false
@@ -4661,6 +4730,8 @@ const resetForm = () => {
   addMethod.value = 'oauth'
   apiKeyBaseUrl.value = 'https://api.anthropic.com'
   apiKeyValue.value = ''
+  openaiBedrockMantle.value = false
+  openaiMantleRegion.value = 'eu-north-1'
   editQuotaLimit.value = null
   editQuotaDailyLimit.value = null
   editQuotaWeeklyLimit.value = null
@@ -4990,7 +5061,11 @@ const handleSubmit = async () => {
       }
     }
 
-    if (bedrockAuthMode.value !== 'claude_platform_aws' && bedrockForceGlobal.value) {
+    if (
+      bedrockAuthMode.value !== 'claude_platform_aws' &&
+      bedrockAuthMode.value !== 'bedrock_mantle' &&
+      bedrockForceGlobal.value
+    ) {
       credentials.aws_force_global = 'true'
     }
 
@@ -5109,10 +5184,17 @@ const handleSubmit = async () => {
         : 'https://api.anthropic.com'
 
   // Build credentials with optional model mapping
-  const credentials: Record<string, unknown> = {
-    base_url: apiKeyBaseUrl.value.trim() || defaultBaseUrl,
-    api_key: apiKeyValue.value.trim()
-  }
+  const credentials: Record<string, unknown> =
+    form.platform === 'openai' && openaiBedrockMantle.value
+      ? {
+          auth_mode: 'bedrock_mantle',
+          aws_region: (openaiMantleRegion.value.trim() || 'eu-north-1'),
+          api_key: apiKeyValue.value.trim()
+        }
+      : {
+          base_url: apiKeyBaseUrl.value.trim() || defaultBaseUrl,
+          api_key: apiKeyValue.value.trim()
+        }
   if (form.platform === 'gemini') {
     credentials.tier_id = geminiTierAIStudio.value
   }
