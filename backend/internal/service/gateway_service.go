@@ -5655,6 +5655,25 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 		})
 	}
 
+	if account != nil && account.IsBedrockMantle() {
+		passthroughBody := parsed.Body.Bytes()
+		passthroughModel := parsed.Model
+		if passthroughModel != "" {
+			if mapped, ok := ResolveBedrockMantleModelID(account, passthroughModel); ok && mapped != passthroughModel {
+				passthroughBody = s.replaceModelInBody(passthroughBody, mapped)
+				logger.LegacyPrintf("service.gateway", "Bedrock Mantle model mapping: %s -> %s (account: %s)", parsed.Model, mapped, account.Name)
+				passthroughModel = mapped
+			}
+		}
+		return s.forwardAnthropicAPIKeyPassthroughWithInput(ctx, c, account, anthropicPassthroughForwardInput{
+			Body:          passthroughBody,
+			RequestModel:  passthroughModel,
+			OriginalModel: parsed.Model,
+			RequestStream: parsed.Stream,
+			StartTime:     startTime,
+		})
+	}
+
 	if account != nil && account.IsBedrock() {
 		return s.forwardBedrock(ctx, c, account, parsed, startTime)
 	}
@@ -6785,7 +6804,9 @@ func (s *GatewayService) buildUpstreamRequestAnthropicAPIKeyPassthrough(
 	token string,
 ) (*http.Request, []byte, error) {
 	targetURL := claudeAPIURL
-	if account.IsClaudePlatformAWS() {
+	if account.IsBedrockMantle() {
+		targetURL = BuildBedrockMantleMessagesURL(bedrockMantleRegion(account))
+	} else if account.IsClaudePlatformAWS() {
 		baseURL := strings.TrimSpace(account.GetCredential("base_url"))
 		if baseURL != "" {
 			validatedURL, err := s.validateUpstreamBaseURL(baseURL)
