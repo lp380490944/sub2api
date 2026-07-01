@@ -82,6 +82,14 @@ func (s *OpenAIGatewayService) forwardAsRawChatCompletions(
 	// 2. Resolve model mapping (same as ForwardAsChatCompletions)
 	billingModel := resolveOpenAIForwardModel(account, originalModel, defaultMappedModel)
 	upstreamModel := normalizeOpenAIModelForUpstream(account, billingModel)
+	// Bedrock Mantle: map friendly Claude names to global.anthropic.* IDs for the
+	// wire, keeping billingModel stable for accounting. Non-Claude models fall
+	// through unchanged (verbatim passthrough).
+	if account.IsOpenAIBedrockMantle() {
+		if gid, ok := ResolveBedrockMantleModelID(account, originalModel); ok {
+			upstreamModel = gid
+		}
+	}
 	// 国产模型默认 effort 补充：需要 mappedModel 判定，推迟到 billingModel 算出之后。
 	reasoningEffort = ApplyThinkingEnabledFallback(reasoningEffort, body, billingModel)
 
