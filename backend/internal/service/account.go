@@ -1176,6 +1176,20 @@ func (a *Account) IsClaudePlatformAWS() bool {
 	return a.IsBedrock() && a.GetCredential("auth_mode") == claudePlatformAWSAuthMode
 }
 
+// IsBedrockMantle reports whether this is an Anthropic Bedrock Mantle account:
+// a bedrock-type account whose auth_mode points at the native Mantle endpoint.
+// It rides the Anthropic API-key passthrough, NOT the SigV4 forwardBedrock path.
+func (a *Account) IsBedrockMantle() bool {
+	return a.IsBedrock() && a.GetCredential("auth_mode") == bedrockMantleAuthMode
+}
+
+// IsOpenAIBedrockMantle reports whether this is an OpenAI-protocol Bedrock Mantle
+// account: an openai apikey account whose auth_mode points at Mantle's
+// /v1/chat/completions endpoint.
+func (a *Account) IsOpenAIBedrockMantle() bool {
+	return a.IsOpenAIApiKey() && a.GetCredential("auth_mode") == bedrockMantleAuthMode
+}
+
 // IsVertex 判断账号是否为 Google Vertex AI 上的 Anthropic Claude（Anthropic 平台 + service_account / 历史 vertex 类型）。
 // Vertex 提供托管的 Anthropic Claude 模型，与 Bedrock 同构但鉴权走 GCP OAuth2。
 func (a *Account) IsVertex() bool {
@@ -1219,6 +1233,9 @@ func (a *Account) GetOpenAIBaseURL() string {
 		return ""
 	}
 	if a.Type == AccountTypeAPIKey {
+		if a.IsOpenAIBedrockMantle() {
+			return BuildBedrockMantleBaseURL(bedrockMantleRegion(a))
+		}
 		baseURL := a.GetCredential("base_url")
 		if baseURL != "" {
 			return baseURL
