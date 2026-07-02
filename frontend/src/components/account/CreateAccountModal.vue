@@ -1760,38 +1760,8 @@
         <div>
           <label class="input-label">{{ t('admin.accounts.bedrockRegion') }}</label>
           <select v-model="bedrockRegion" class="input">
-            <optgroup label="US">
-              <option value="us-east-1">us-east-1 (N. Virginia)</option>
-              <option value="us-east-2">us-east-2 (Ohio)</option>
-              <option value="us-west-1">us-west-1 (N. California)</option>
-              <option value="us-west-2">us-west-2 (Oregon)</option>
-              <option value="us-gov-east-1">us-gov-east-1 (GovCloud US-East)</option>
-              <option value="us-gov-west-1">us-gov-west-1 (GovCloud US-West)</option>
-            </optgroup>
-            <optgroup label="Europe">
-              <option value="eu-west-1">eu-west-1 (Ireland)</option>
-              <option value="eu-west-2">eu-west-2 (London)</option>
-              <option value="eu-west-3">eu-west-3 (Paris)</option>
-              <option value="eu-central-1">eu-central-1 (Frankfurt)</option>
-              <option value="eu-central-2">eu-central-2 (Zurich)</option>
-              <option value="eu-south-1">eu-south-1 (Milan)</option>
-              <option value="eu-south-2">eu-south-2 (Spain)</option>
-              <option value="eu-north-1">eu-north-1 (Stockholm)</option>
-            </optgroup>
-            <optgroup label="Asia Pacific">
-              <option value="ap-northeast-1">ap-northeast-1 (Tokyo)</option>
-              <option value="ap-northeast-2">ap-northeast-2 (Seoul)</option>
-              <option value="ap-northeast-3">ap-northeast-3 (Osaka)</option>
-              <option value="ap-south-1">ap-south-1 (Mumbai)</option>
-              <option value="ap-south-2">ap-south-2 (Hyderabad)</option>
-              <option value="ap-southeast-1">ap-southeast-1 (Singapore)</option>
-              <option value="ap-southeast-2">ap-southeast-2 (Sydney)</option>
-            </optgroup>
-            <optgroup label="Canada">
-              <option value="ca-central-1">ca-central-1 (Canada)</option>
-            </optgroup>
-            <optgroup label="South America">
-              <option value="sa-east-1">sa-east-1 (São Paulo)</option>
+            <optgroup v-for="grp in AWS_BEDROCK_REGIONS" :key="grp.label" :label="grp.label">
+              <option v-for="r in grp.options" :key="r.code" :value="r.code">{{ r.code }} ({{ r.city }})</option>
             </optgroup>
           </select>
           <p class="input-hint">{{ t('admin.accounts.bedrockRegionHint') }}</p>
@@ -3604,7 +3574,7 @@ import {
 } from '@/components/account/credentialsBuilder'
 import { formatDateTimeLocalInput, parseDateTimeLocalInput } from '@/utils/format'
 import { createStableObjectKeyResolver } from '@/utils/stableObjectKey'
-import { VERTEX_LOCATION_OPTIONS } from '@/constants/account'
+import { AWS_BEDROCK_REGIONS, VERTEX_LOCATION_OPTIONS } from '@/constants/account'
 import {
   OPENAI_WS_MODE_CTX_POOL,
   OPENAI_WS_MODE_OFF,
