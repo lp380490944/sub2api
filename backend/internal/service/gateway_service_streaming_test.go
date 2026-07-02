@@ -27,6 +27,16 @@ func newStreamingResponseTestGatewayService() *GatewayService {
 	}
 }
 
+// sseResponseHeader returns the Content-Type this fork requires to treat a response as a
+// live SSE stream. Without text/event-stream, streamContentTypeLooksSuspicious flags the
+// response and the fork buffers the entire body first (a guard against HTML error pages
+// served as 200), which collapses the streaming idle gap these keepalive tests rely on.
+// Real Anthropic SSE responses always carry this header — keep it when syncing upstream
+// streaming tests, otherwise the keepalive tests silently regress to buffering.
+func sseResponseHeader() http.Header {
+	return http.Header{"Content-Type": {"text/event-stream"}}
+}
+
 func TestGatewayService_StreamingReusesScannerBufferAndStillParsesUsage(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	svc := newStreamingResponseTestGatewayService()
@@ -36,7 +46,7 @@ func TestGatewayService_StreamingReusesScannerBufferAndStillParsesUsage(t *testi
 	c.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", nil)
 
 	pr, pw := io.Pipe()
-	resp := &http.Response{StatusCode: http.StatusOK, Header: http.Header{}, Body: pr}
+	resp := &http.Response{StatusCode: http.StatusOK, Header: sseResponseHeader(), Body: pr}
 
 	go func() {
 		defer func() { _ = pw.Close() }()
@@ -65,7 +75,7 @@ func TestGatewayService_StreamingKeepaliveUsesIdleTimer(t *testing.T) {
 	c.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", nil)
 
 	pr, pw := io.Pipe()
-	resp := &http.Response{StatusCode: http.StatusOK, Header: http.Header{}, Body: pr}
+	resp := &http.Response{StatusCode: http.StatusOK, Header: sseResponseHeader(), Body: pr}
 
 	go func() {
 		defer func() { _ = pw.Close() }()
@@ -92,7 +102,7 @@ func TestGatewayService_StreamingKeepaliveUsesNoopDeltaForAffectedClaudeCodeVers
 	c.Request.Header.Set("User-Agent", "claude-cli/2.1.198 (external, cli)")
 
 	pr, pw := io.Pipe()
-	resp := &http.Response{StatusCode: http.StatusOK, Header: http.Header{}, Body: pr}
+	resp := &http.Response{StatusCode: http.StatusOK, Header: sseResponseHeader(), Body: pr}
 
 	go func() {
 		defer func() { _ = pw.Close() }()
@@ -123,7 +133,7 @@ func TestGatewayService_StreamingKeepaliveUsesNoopDeltaDuringToolUseForAffectedC
 	c.Request.Header.Set("User-Agent", "claude-cli/2.1.198 (external, cli)")
 
 	pr, pw := io.Pipe()
-	resp := &http.Response{StatusCode: http.StatusOK, Header: http.Header{}, Body: pr}
+	resp := &http.Response{StatusCode: http.StatusOK, Header: sseResponseHeader(), Body: pr}
 
 	go func() {
 		defer func() { _ = pw.Close() }()
@@ -155,7 +165,7 @@ func TestGatewayService_StreamingKeepaliveKeepsPingForOlderClaudeCodeVersion(t *
 	c.Request.Header.Set("User-Agent", "claude-cli/2.1.187 (external, cli)")
 
 	pr, pw := io.Pipe()
-	resp := &http.Response{StatusCode: http.StatusOK, Header: http.Header{}, Body: pr}
+	resp := &http.Response{StatusCode: http.StatusOK, Header: sseResponseHeader(), Body: pr}
 
 	go func() {
 		defer func() { _ = pw.Close() }()
