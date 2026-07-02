@@ -239,9 +239,26 @@ watch(
       result.value = null
       errorMessage.value = ''
       submitting.value = false
+      apiKey.value = ''
+      selectedRegions.value = [...allCommercialCodes]
+      profileGeo.value = true
+      profileGlobal.value = true
+      splitGroups.value = false
+      groupId.value = null
+      geoGroupId.value = null
+      globalGroupId.value = null
+      priority.value = 50
+      concurrency.value = 5
+      loadFactor.value = 1
+      namePrefix.value = 'bedrock'
+      poolMode.value = false
     }
   }
 )
+
+watch([profileGeo, profileGlobal], ([geo, global]) => {
+  if (!(geo && global)) splitGroups.value = false
+})
 
 const handleSubmit = async () => {
   if (!canSubmit.value) return
@@ -255,9 +272,9 @@ const handleSubmit = async () => {
   try {
     const res = await adminAPI.accounts.batchCreate(accounts)
     const failures = res.results
-      .map((r, i) => ({ ok: r.success, name: accounts[i]?.name ?? '', error: r.error ?? 'unknown' }))
-      .filter((x) => !x.ok)
-      .map((x) => ({ name: x.name, error: x.error }))
+      .map((r, i) => ({ r, name: r.name ?? accounts[i]?.name ?? '' }))
+      .filter((x) => !x.r.success)
+      .map((x) => ({ name: x.name, error: x.r.error ?? 'unknown' }))
     result.value = { success: res.success, failed: res.failed, failures }
     emit('created')
     if (res.failed === 0) emit('close')
