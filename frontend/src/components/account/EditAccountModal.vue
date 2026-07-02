@@ -797,7 +797,7 @@
       <!-- Bedrock fields (for bedrock type, both SigV4 and API Key modes) -->
       <div v-if="account.type === 'bedrock'" class="space-y-4">
         <!-- SigV4 fields -->
-        <template v-if="!isBedrockAPIKeyMode && !isClaudePlatformAWSMode">
+        <template v-if="!isBedrockAPIKeyMode && !isClaudePlatformAWSMode && !isBedrockMantleMode">
           <div>
             <label class="input-label">{{ t('admin.accounts.bedrockAccessKeyId') }}</label>
             <input
@@ -830,7 +830,7 @@
         </template>
 
         <!-- API Key field -->
-        <div v-if="isBedrockAPIKeyMode || isClaudePlatformAWSMode">
+        <div v-if="isBedrockAPIKeyMode || isClaudePlatformAWSMode || isBedrockMantleMode">
           <label class="input-label">{{ t('admin.accounts.bedrockApiKeyInput') }}</label>
           <input
             v-model="editBedrockApiKeyValue"
@@ -864,7 +864,7 @@
         </div>
 
         <!-- Shared: Force Global -->
-        <div>
+        <div v-if="!isBedrockMantleMode">
           <label class="flex items-center gap-2 cursor-pointer">
             <input
               v-model="editBedrockForceGlobal"
@@ -931,7 +931,7 @@
               + {{ t('admin.accounts.addMapping') }}
             </button>
             <!-- Bedrock Preset Mappings -->
-            <div v-if="!isClaudePlatformAWSMode" class="flex flex-wrap gap-2">
+            <div v-if="!isClaudePlatformAWSMode && !isBedrockMantleMode" class="flex flex-wrap gap-2">
               <button
                 v-for="preset in bedrockPresets"
                 :key="preset.from"
@@ -2760,6 +2760,10 @@ const isClaudePlatformAWSMode = computed(() =>
   props.account?.type === 'bedrock' &&
   (props.account?.credentials as Record<string, unknown>)?.auth_mode === 'claude_platform_aws'
 )
+const isBedrockMantleMode = computed(() =>
+  props.account?.type === 'bedrock' &&
+  (props.account?.credentials as Record<string, unknown>)?.auth_mode === 'bedrock_mantle'
+)
 // Vertex AI: legacy `vertex` uses gcp_project_id/gcp_region + gcp_service_account_json;
 // `service_account` uses project_id/location/client_email + service_account_json.
 const editVertexServiceAccountJson = ref('')
@@ -3485,7 +3489,7 @@ const syncFormFromAccount = (newAccount: Account | null) => {
     editBedrockForceGlobal.value = (bedrockCreds.aws_force_global as string) === 'true'
     editBedrockWorkspaceId.value = (bedrockCreds.workspace_id as string) || ''
 
-    if (authMode === 'apikey' || authMode === 'claude_platform_aws') {
+    if (authMode === 'apikey' || authMode === 'claude_platform_aws' || authMode === 'bedrock_mantle') {
       editBedrockApiKeyValue.value = ''
     } else {
       editBedrockAccessKeyId.value = (bedrockCreds.aws_access_key_id as string) || ''
@@ -4247,7 +4251,7 @@ const handleSubmit = async () => {
       const newCredentials: Record<string, unknown> = { ...currentCredentials }
 
       newCredentials.aws_region = editBedrockRegion.value.trim()
-      if (isClaudePlatformAWSMode.value) {
+      if (isClaudePlatformAWSMode.value || isBedrockMantleMode.value) {
         delete newCredentials.aws_force_global
       } else if (editBedrockForceGlobal.value) {
         newCredentials.aws_force_global = 'true'
@@ -4255,7 +4259,7 @@ const handleSubmit = async () => {
         delete newCredentials.aws_force_global
       }
 
-      if (isBedrockAPIKeyMode.value || isClaudePlatformAWSMode.value) {
+      if (isBedrockAPIKeyMode.value || isClaudePlatformAWSMode.value || isBedrockMantleMode.value) {
         // API Key mode: only update api_key if user provided new value
         if (editBedrockApiKeyValue.value.trim()) {
           newCredentials.api_key = editBedrockApiKeyValue.value.trim()
@@ -4266,6 +4270,12 @@ const handleSubmit = async () => {
             return
           }
           newCredentials.workspace_id = editBedrockWorkspaceId.value.trim()
+        }
+        if (isBedrockMantleMode.value) {
+          delete newCredentials.aws_access_key_id
+          delete newCredentials.aws_secret_access_key
+          delete newCredentials.aws_session_token
+          delete newCredentials.workspace_id
         }
       } else {
         // SigV4 mode
