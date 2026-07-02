@@ -6412,7 +6412,6 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 				StatusCode:             resp.StatusCode,
 				ResponseBody:           respBody,
 				RetryableOnSameAccount: account.IsPoolMode() && account.IsPoolModeRetryableStatus(resp.StatusCode),
-				SoftRateLimitOnExhaust: account.IsBedrockAPIKey() && resp.StatusCode == http.StatusTooManyRequests,
 			}
 		}
 		return s.handleRetryExhaustedError(ctx, resp, c, account)
@@ -6447,7 +6446,6 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 			StatusCode:             resp.StatusCode,
 			ResponseBody:           respBody,
 			RetryableOnSameAccount: account.IsPoolMode() && account.IsPoolModeRetryableStatus(resp.StatusCode),
-			SoftRateLimitOnExhaust: account.IsBedrockAPIKey() && resp.StatusCode == http.StatusTooManyRequests,
 		}
 	}
 	if resp.StatusCode >= 400 {
@@ -6824,7 +6822,6 @@ func (s *GatewayService) forwardAnthropicAPIKeyPassthroughWithInput(
 				StatusCode:             resp.StatusCode,
 				ResponseBody:           respBody,
 				RetryableOnSameAccount: account.IsPoolMode() && account.IsPoolModeRetryableStatus(resp.StatusCode),
-				SoftRateLimitOnExhaust: account.IsBedrockAPIKey() && resp.StatusCode == http.StatusTooManyRequests,
 			}
 		}
 		return s.handleRetryExhaustedError(ctx, resp, c, account)
@@ -6859,7 +6856,6 @@ func (s *GatewayService) forwardAnthropicAPIKeyPassthroughWithInput(
 			StatusCode:             resp.StatusCode,
 			ResponseBody:           respBody,
 			RetryableOnSameAccount: account.IsPoolMode() && account.IsPoolModeRetryableStatus(resp.StatusCode),
-			SoftRateLimitOnExhaust: account.IsBedrockAPIKey() && resp.StatusCode == http.StatusTooManyRequests,
 		}
 	}
 
