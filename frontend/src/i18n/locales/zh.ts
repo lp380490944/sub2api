@@ -3999,8 +3999,6 @@ export default {
         concurrency: '并发（每账号）',
         loadFactor: '负载权重',
         namePrefix: '名称前缀',
-        poolMode: '为每个账号启用 pool_mode',
-        poolModeHint: '共享密钥遇到临时 401/403/429 时不被本地禁用；若希望调度器在区域间自动切换，请保持关闭。',
         willCreate: '将创建 {count} 个账号（{regions} 区域 × {profiles} 配置）。',
         confirmLarge: '将创建 {count} 个账号，是否继续？',
         selectRegionsProfiles: '请至少选择一个区域和一种配置。',

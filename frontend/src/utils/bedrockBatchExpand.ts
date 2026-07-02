@@ -15,8 +15,6 @@ export interface BedrockBatchConfig {
   priority: number
   concurrency: number
   loadFactor: number
-  /** When true, sets credentials.pool_mode = true on every account. */
-  poolMode: boolean
   /** group_ids assigned to geo-profile accounts. */
   geoGroupIds: number[]
   /** group_ids assigned to global-profile accounts (equals geoGroupIds when not split). */
@@ -46,7 +44,6 @@ export function expandBedrockBatch(config: BedrockBatchConfig): CreateAccountReq
         aws_region: region,
         aws_force_global: isGlobal ? 'true' : 'false',
       }
-      if (config.poolMode) credentials.pool_mode = true
 
       out.push({
         name: `${prefix}-${region}-${isGlobal ? 'global' : 'geo'}`,

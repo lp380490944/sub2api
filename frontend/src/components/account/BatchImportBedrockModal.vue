@@ -108,13 +108,6 @@
       <p class="input-hint">{{ t('admin.accounts.batchBedrock.groupHint') }}</p>
       <p v-if="noGroupSelected" class="text-xs text-amber-600 dark:text-amber-400">{{ t('admin.accounts.batchBedrock.noGroupWarning') }}</p>
 
-      <!-- Advanced -->
-      <label class="flex items-center gap-2 cursor-pointer">
-        <input v-model="poolMode" type="checkbox" class="rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-dark-500" />
-        <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('admin.accounts.batchBedrock.poolMode') }}</span>
-      </label>
-      <p class="input-hint">{{ t('admin.accounts.batchBedrock.poolModeHint') }}</p>
-
       <!-- Result -->
       <div v-if="errorMessage" class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300">
         {{ errorMessage }}
@@ -175,7 +168,6 @@ const priority = ref(50)
 const concurrency = ref(5)
 const loadFactor = ref(1)
 const namePrefix = ref('bedrock')
-const poolMode = ref(false)
 const submitting = ref(false)
 const result = ref<{ success: number; failed: number; failures: Array<{ name: string; error: string }> } | null>(null)
 const errorMessage = ref('')
@@ -230,7 +222,6 @@ const buildConfig = () => ({
   priority: priority.value,
   concurrency: concurrency.value,
   loadFactor: loadFactor.value,
-  poolMode: poolMode.value,
   geoGroupIds: geoGroupIds.value,
   globalGroupIds: globalGroupIds.value,
 })
@@ -256,7 +247,6 @@ watch(
       concurrency.value = 5
       loadFactor.value = 1
       namePrefix.value = 'bedrock'
-      poolMode.value = false
     }
   }
 )

@@ -3848,8 +3848,6 @@ export default {
         concurrency: 'Concurrency (per account)',
         loadFactor: 'Load factor',
         namePrefix: 'Name prefix',
-        poolMode: 'Enable pool_mode on each account',
-        poolModeHint: 'Keeps a shared key from being locally disabled on transient 401/403/429; leave off to let the scheduler fail over between regions.',
         willCreate: 'Will create {count} accounts ({regions} regions × {profiles} profiles).',
         confirmLarge: 'This will create {count} accounts. Continue?',
         selectRegionsProfiles: 'Select at least one region and one profile.',

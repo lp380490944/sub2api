@@ -9,7 +9,6 @@ const base: BedrockBatchConfig = {
   priority: 50,
   concurrency: 5,
   loadFactor: 1,
-  poolMode: false,
   geoGroupIds: [7],
   globalGroupIds: [7],
 }
@@ -32,12 +31,6 @@ describe('expandBedrockBatch', () => {
       aws_force_global: 'false',
     })
     expect(glob.credentials).toMatchObject({ aws_force_global: 'true' })
-  })
-
-  it('omits pool_mode unless enabled, and sets boolean true when enabled', () => {
-    expect(expandBedrockBatch(base)[0].credentials).not.toHaveProperty('pool_mode')
-    const withPool = expandBedrockBatch({ ...base, poolMode: true })
-    expect(withPool[0].credentials).toMatchObject({ pool_mode: true })
   })
 
   it('applies shared priority/concurrency/load_factor to every account', () => {
