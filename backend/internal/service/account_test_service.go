@@ -210,8 +210,15 @@ func (s *AccountTestService) testClaudeAccountConnection(c *gin.Context, account
 		testModelID = account.GetMappedModel(testModelID)
 	}
 
-	// Bedrock accounts use a separate test path
-	if account.IsBedrock() {
+	// Bedrock Mantle is a native Anthropic-protocol endpoint (plain API key),
+	// NOT SigV4/InvokeModel. Resolve its global.* model and let it flow through
+	// the native /v1/messages test path below (the auth block sets its URL).
+	if account.IsBedrockMantle() {
+		if mappedModel, ok := ResolveBedrockMantleModelID(account, testModelID); ok {
+			testModelID = mappedModel
+		}
+	} else if account.IsBedrock() {
+		// SigV4 / Bedrock API Key accounts use the InvokeModel test path.
 		return s.testBedrockAccountConnection(c, ctx, account, testModelID)
 	}
 	if account.Type == AccountTypeServiceAccount {
@@ -248,6 +255,14 @@ func (s *AccountTestService) testClaudeAccountConnection(c *gin.Context, account
 			return s.sendErrorAndEnd(c, fmt.Sprintf("Invalid base URL: %s", err.Error()))
 		}
 		apiURL = strings.TrimSuffix(normalizedBaseURL, "/") + "/v1/messages"
+	} else if account.IsBedrockMantle() {
+		// Bedrock Mantle: native Anthropic protocol at the Mantle endpoint, plain API key.
+		useBearer = false
+		authToken = account.GetCredential("api_key")
+		if authToken == "" {
+			return s.sendErrorAndEnd(c, "No API key available")
+		}
+		apiURL = BuildBedrockMantleMessagesURL(bedrockMantleRegion(account))
 	} else {
 		return s.sendErrorAndEnd(c, fmt.Sprintf("Unsupported account type: %s", account.Type))
 	}
