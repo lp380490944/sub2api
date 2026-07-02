@@ -47,6 +47,7 @@
                 :amounts="[10, 20, 50, 100, 200, 500, 1000, 2000, 5000]"
                 :min="globalMinAmount"
                 :max="globalMaxAmount"
+                :currency="displayCurrency"
               />
               <p v-if="amountError" class="mt-2 text-xs text-amber-600 dark:text-amber-300">{{ amountError }}</p>
             </div>
@@ -182,7 +183,7 @@
                 <p class="text-gray-500 dark:text-gray-400">{{ t('payment.noPlans') }}</p>
               </div>
               <div v-else :class="planGridClass">
-                <SubscriptionPlanCard v-for="plan in checkout.plans" :key="plan.id" :plan="plan" :active-subscriptions="activeSubscriptions" @select="selectPlan" />
+                <SubscriptionPlanCard v-for="plan in checkout.plans" :key="plan.id" :plan="plan" :currency="displayCurrency" :active-subscriptions="activeSubscriptions" @select="selectPlan" />
               </div>
               <!-- Active subscriptions (compact, below plan list) -->
               <div v-if="activeSubscriptions.length > 0">
@@ -231,7 +232,7 @@
             </button>
             <h3 class="mb-4 text-lg font-semibold text-gray-900 dark:text-white">{{ t('payment.selectPlan') }}</h3>
             <div class="space-y-4">
-              <SubscriptionPlanCard v-for="plan in renewalPlans" :key="plan.id" :plan="plan" :active-subscriptions="activeSubscriptions" @select="selectPlanFromModal" />
+              <SubscriptionPlanCard v-for="plan in renewalPlans" :key="plan.id" :plan="plan" :currency="displayCurrency" :active-subscriptions="activeSubscriptions" @select="selectPlanFromModal" />
             </div>
           </div>
         </div>
@@ -552,8 +553,13 @@ const localeCode = computed(() => {
   return undefined
 })
 
+// Display-only currency: what the payment page RENDERS, independent of the
+// currency Stripe actually charges (selectedCurrency). zh locale -> CNY,
+// every other locale -> USD. Does not affect amounts sent to the backend.
+const displayCurrency = computed(() => (localeCode.value === 'zh' ? 'CNY' : 'USD'))
+
 function formatSelectedPaymentAmount(value: number): string {
-  return formatPaymentAmount(value, selectedCurrency.value, localeCode.value)
+  return formatPaymentAmount(value, displayCurrency.value, localeCode.value)
 }
 
 const methodOptions = computed<PaymentMethodOption[]>(() =>
