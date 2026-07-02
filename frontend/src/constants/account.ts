@@ -91,3 +91,133 @@ export const VERTEX_LOCATION_OPTIONS = [
     ]
   }
 ] as const
+
+/** One selectable AWS region for Bedrock. */
+export interface AwsBedrockRegion {
+  code: string
+  city: string
+}
+
+/** A geography-grouped block of Bedrock regions. `commercial:false` = not selected by default (GovCloud). */
+export interface AwsBedrockRegionGroup {
+  label: string
+  commercial: boolean
+  options: AwsBedrockRegion[]
+}
+
+/**
+ * Canonical AWS region list for Bedrock accounts. Single source of truth shared by the
+ * single-create region <select> and the batch-import board. Mirrors the AWS console region
+ * picker (commercial regions); GovCloud kept but flagged non-commercial (not default-selected).
+ */
+export const AWS_BEDROCK_REGIONS: AwsBedrockRegionGroup[] = [
+  {
+    label: 'US',
+    commercial: true,
+    options: [
+      { code: 'us-east-1', city: 'N. Virginia' },
+      { code: 'us-east-2', city: 'Ohio' },
+      { code: 'us-west-1', city: 'N. California' },
+      { code: 'us-west-2', city: 'Oregon' },
+    ],
+  },
+  {
+    label: 'Africa',
+    commercial: true,
+    options: [{ code: 'af-south-1', city: 'Cape Town' }],
+  },
+  {
+    label: 'Asia Pacific',
+    commercial: true,
+    options: [
+      { code: 'ap-east-1', city: 'Hong Kong' },
+      { code: 'ap-east-2', city: 'Taipei' },
+      { code: 'ap-south-1', city: 'Mumbai' },
+      { code: 'ap-south-2', city: 'Hyderabad' },
+      { code: 'ap-southeast-1', city: 'Singapore' },
+      { code: 'ap-southeast-2', city: 'Sydney' },
+      { code: 'ap-southeast-3', city: 'Jakarta' },
+      { code: 'ap-southeast-4', city: 'Melbourne' },
+      { code: 'ap-southeast-5', city: 'Malaysia' },
+      { code: 'ap-southeast-6', city: 'New Zealand' },
+      { code: 'ap-southeast-7', city: 'Thailand' },
+      { code: 'ap-northeast-1', city: 'Tokyo' },
+      { code: 'ap-northeast-2', city: 'Seoul' },
+      { code: 'ap-northeast-3', city: 'Osaka' },
+    ],
+  },
+  {
+    label: 'Canada',
+    commercial: true,
+    options: [
+      { code: 'ca-central-1', city: 'Central' },
+      { code: 'ca-west-1', city: 'Calgary' },
+    ],
+  },
+  {
+    label: 'Europe',
+    commercial: true,
+    options: [
+      { code: 'eu-central-1', city: 'Frankfurt' },
+      { code: 'eu-central-2', city: 'Zurich' },
+      { code: 'eu-west-1', city: 'Ireland' },
+      { code: 'eu-west-2', city: 'London' },
+      { code: 'eu-west-3', city: 'Paris' },
+      { code: 'eu-south-1', city: 'Milan' },
+      { code: 'eu-south-2', city: 'Spain' },
+      { code: 'eu-north-1', city: 'Stockholm' },
+    ],
+  },
+  {
+    label: 'Mexico',
+    commercial: true,
+    options: [{ code: 'mx-central-1', city: 'Central' }],
+  },
+  {
+    label: 'Middle East',
+    commercial: true,
+    options: [
+      { code: 'me-south-1', city: 'Bahrain' },
+      { code: 'me-central-1', city: 'UAE' },
+    ],
+  },
+  {
+    label: 'Israel',
+    commercial: true,
+    options: [{ code: 'il-central-1', city: 'Tel Aviv' }],
+  },
+  {
+    label: 'South America',
+    commercial: true,
+    options: [{ code: 'sa-east-1', city: 'São Paulo' }],
+  },
+  {
+    label: 'GovCloud',
+    commercial: false,
+    options: [
+      { code: 'us-gov-east-1', city: 'GovCloud US-East' },
+      { code: 'us-gov-west-1', city: 'GovCloud US-West' },
+    ],
+  },
+]
+
+/** Flat list of commercial region codes (default selection for the batch board). */
+export function commercialBedrockRegionCodes(): string[] {
+  return AWS_BEDROCK_REGIONS.filter((g) => g.commercial).flatMap((g) => g.options.map((o) => o.code))
+}
+
+/**
+ * Geo-profile family for a region, mirroring backend BedrockCrossRegionPrefix
+ * (backend/internal/service/bedrock_request.go). Preview-only: the backend recomputes
+ * this at request time. us-gov→us-gov, us-→us, eu-→eu, ap-northeast-1→jp,
+ * ap-southeast-2→au, other ap-→apac, everything else→us.
+ */
+export function awsBedrockGeoFamily(region: string): string {
+  if (region.startsWith('us-gov')) return 'us-gov'
+  if (region.startsWith('us-')) return 'us'
+  if (region.startsWith('eu-')) return 'eu'
+  if (region === 'ap-northeast-1') return 'jp'
+  if (region === 'ap-southeast-2') return 'au'
+  if (region.startsWith('ap-')) return 'apac'
+  return 'us'
+}
