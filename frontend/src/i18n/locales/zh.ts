@@ -4009,6 +4009,8 @@ export default {
         resultSummary: '成功 {success} 个，失败 {failed} 个。',
         resultFailures: '失败明细',
         nonBedrockRegionHint: '并非所有 AWS 区域都提供 Bedrock Claude；不支持的区域会在请求时报错。',
+        globalOnly: '仅 global',
+        geoAvailabilityHint: '地理型（Geo）配置仅适用于 US、EU、JP（东京/大阪）、AU（悉尼/墨尔本），以及 ca-central-1（归入 US 地理）。其他区域没有地理配置，只会创建 Global 账号。',
       },
       openaiMantleToggle: '使用 AWS Bedrock Mantle 端点',
       apiKeyIsRequired: 'API Key 是必需的',

@@ -25,6 +25,7 @@
             <span class="text-sm text-gray-600 dark:text-gray-400">{{ t('admin.accounts.batchBedrock.splitGroups') }}</span>
           </label>
         </div>
+        <p v-if="profileGeo" class="input-hint">{{ t('admin.accounts.batchBedrock.geoAvailabilityHint') }}</p>
       </div>
 
       <!-- Regions -->
@@ -50,7 +51,11 @@
                   @change="toggleRegion(r.code)"
                 />
                 <span class="font-mono text-gray-700 dark:text-gray-300">{{ r.code }}</span>
-                <span class="text-gray-400">{{ r.city }} · {{ awsBedrockGeoFamily(r.code) }}.</span>
+                <span class="text-gray-400">
+                  {{ r.city }} ·
+                  <template v-if="awsBedrockGeoFamily(r.code)">{{ awsBedrockGeoFamily(r.code) }}.</template>
+                  <span v-else class="text-amber-600 dark:text-amber-400">{{ t('admin.accounts.batchBedrock.globalOnly') }}</span>
+                </span>
               </label>
             </div>
           </div>

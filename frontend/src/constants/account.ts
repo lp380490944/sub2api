@@ -207,17 +207,24 @@ export function commercialBedrockRegionCodes(): string[] {
 }
 
 /**
- * Geo-profile family for a region, mirroring backend BedrockCrossRegionPrefix
- * (backend/internal/service/bedrock_request.go). Preview-only: the backend recomputes
- * this at request time. us-gov→us-gov, us-→us, eu-→eu, ap-northeast-1→jp,
- * ap-southeast-2→au, other ap-→apac, everything else→us.
+ * Geographic cross-region inference family for a region, per Anthropic's current-model
+ * Bedrock region table (US / EU / JP / AU + GovCloud). Returns '' when the region has NO
+ * geographic profile — those regions are reachable only via the global. profile, so a
+ * "Geo" account there is invalid (e.g. sa-east-1 + us. → 400 invalid model identifier).
+ * Mirrors backend BedrockCrossRegionPrefix (bedrock_request.go), except the backend
+ * returns 'global' for the no-geo case while the UI uses '' to mean "no geo, global only".
+ * Note: there is no apac. profile for current Claude models (Claude-3 era only).
  */
 export function awsBedrockGeoFamily(region: string): string {
   if (region.startsWith('us-gov')) return 'us-gov'
-  if (region.startsWith('us-')) return 'us'
+  if (region === 'ca-central-1' || region.startsWith('us-')) return 'us'
   if (region.startsWith('eu-')) return 'eu'
-  if (region === 'ap-northeast-1') return 'jp'
-  if (region === 'ap-southeast-2') return 'au'
-  if (region.startsWith('ap-')) return 'apac'
-  return 'us'
+  if (region === 'ap-northeast-1' || region === 'ap-northeast-3') return 'jp'
+  if (region === 'ap-southeast-2' || region === 'ap-southeast-4') return 'au'
+  return '' // no geographic profile → global-only
+}
+
+/** Whether a region has a geographic cross-region inference profile (can get a "Geo" account). */
+export function awsBedrockRegionHasGeo(region: string): boolean {
+  return awsBedrockGeoFamily(region) !== ''
 }

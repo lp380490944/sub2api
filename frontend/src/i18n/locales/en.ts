@@ -3858,6 +3858,8 @@ export default {
         resultSummary: '{success} created, {failed} failed.',
         resultFailures: 'Failures',
         nonBedrockRegionHint: 'Not all AWS regions serve Bedrock Claude; unsupported regions fail at request time.',
+        globalOnly: 'global only',
+        geoAvailabilityHint: 'Geo profiles exist only for US, EU, JP (Tokyo/Osaka) and AU (Sydney/Melbourne) — plus ca-central-1 (US geo). Other regions have no geo profile, so they only get a Global account.',
       },
       openaiMantleToggle: 'Use AWS Bedrock Mantle endpoint',
       apiKeyIsRequired: 'API Key is required',

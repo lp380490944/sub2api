@@ -21,28 +21,30 @@ const featureKeyBedrockCCCompat = "bedrock_cc_compat"
 
 var bedrockCrossRegionPrefixes = []string{"us.", "eu.", "apac.", "jp.", "au.", "us-gov.", "global."}
 
-// BedrockCrossRegionPrefix 根据 AWS Region 返回 Bedrock 跨区域推理的模型 ID 前缀
-// 参考: https://docs.aws.amazon.com/bedrock/latest/userguide/inference-profiles-support.html
+// BedrockCrossRegionPrefix 根据 AWS Region 返回 Bedrock 跨区域推理的模型 ID 前缀。
+// 依据 Anthropic 当前模型（Haiku 4.5 / Opus 4.x / Sonnet 5 等）的 Bedrock 区域表：
+// https://platform.claude.com/docs/en/build-with-claude/claude-in-amazon-bedrock
+// 仅 US / EU / JP / AU（以及 GovCloud）有地理型跨区域推理配置；其余区域只能走 global.
+// 说明：当前模型 **没有** apac. 地理配置（apac. 属于 Claude 3.x 时代），仅在
+// bedrockCrossRegionPrefixes 中保留以便识别/替换旧 ID。非地理区域返回 "global"，
+// 避免像 sa-east-1 这样的区域被错误加上 us. 前缀而收到 400（invalid model identifier）。
 func BedrockCrossRegionPrefix(region string) string {
 	switch {
 	case strings.HasPrefix(region, "us-gov"):
 		return "us-gov" // GovCloud 使用独立的 us-gov 前缀
-	case strings.HasPrefix(region, "us-"):
+	// US 地理配置同时覆盖 Canada Central（见 Anthropic 区域表）
+	case region == "ca-central-1", strings.HasPrefix(region, "us-"):
 		return "us"
 	case strings.HasPrefix(region, "eu-"):
 		return "eu"
-	case region == "ap-northeast-1":
-		return "jp" // 日本区域使用独立的 jp 前缀（AWS 官方定义）
-	case region == "ap-southeast-2":
-		return "au" // 澳大利亚区域使用独立的 au 前缀（AWS 官方定义）
-	case strings.HasPrefix(region, "ap-"):
-		return "apac" // 其余亚太区域使用通用 apac 前缀
-	case strings.HasPrefix(region, "ca-"):
-		return "us" // 加拿大区域使用 us 前缀的跨区域推理
-	case strings.HasPrefix(region, "sa-"):
-		return "us" // 南美区域使用 us 前缀的跨区域推理
+	case region == "ap-northeast-1", region == "ap-northeast-3":
+		return "jp" // 日本地理配置：东京 / 大阪
+	case region == "ap-southeast-2", region == "ap-southeast-4":
+		return "au" // 澳大利亚地理配置：悉尼 / 墨尔本
 	default:
-		return "us"
+		// 无地理配置（sa-east-1、ca-west-1、af-*、me-*、il-*、mx-*、ap-south-*、
+		// ap-southeast-1/3、ap-northeast-2、ap-east-* 等）：当前模型仅支持 global 跨区域推理。
+		return "global"
 	}
 }
 

@@ -1,4 +1,5 @@
 import type { CreateAccountRequest } from '@/types'
+import { awsBedrockRegionHasGeo } from '@/constants/account'
 
 export type BedrockProfile = 'geo' | 'global'
 
@@ -35,6 +36,10 @@ export function expandBedrockBatch(config: BedrockBatchConfig): CreateAccountReq
   for (const region of config.regions) {
     for (const profile of config.profiles) {
       const isGlobal = profile === 'global'
+      // Global-only regions have no geographic inference profile, so a "Geo" account there
+      // resolves to an invalid model id (e.g. sa-east-1 → us.anthropic... → 400). Skip it;
+      // such regions still get a Global account when the Global profile is selected.
+      if (!isGlobal && !awsBedrockRegionHasGeo(region)) continue
       const credentials: Record<string, unknown> = {
         auth_mode: 'apikey',
         api_key: apiKey,

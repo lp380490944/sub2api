@@ -63,4 +63,16 @@ describe('expandBedrockBatch', () => {
     expect(expandBedrockBatch({ ...base, regions: [] })).toHaveLength(0)
     expect(expandBedrockBatch({ ...base, profiles: [] })).toHaveLength(0)
   })
+
+  it('skips the Geo account for global-only regions (no geographic profile)', () => {
+    // sa-east-1 has no geo profile → only a global account; us-east-1 (geo-capable) gets both.
+    const accts = expandBedrockBatch({ ...base, regions: ['us-east-1', 'sa-east-1'], profiles: ['geo', 'global'] })
+    const names = accts.map((a) => a.name).sort()
+    expect(names).toEqual(['bedrock-sa-east-1-global', 'bedrock-us-east-1-geo', 'bedrock-us-east-1-global'])
+    expect(names).not.toContain('bedrock-sa-east-1-geo')
+  })
+
+  it('creates no accounts when only Geo is selected for global-only regions', () => {
+    expect(expandBedrockBatch({ ...base, regions: ['sa-east-1', 'me-central-1'], profiles: ['geo'] })).toHaveLength(0)
+  })
 })
