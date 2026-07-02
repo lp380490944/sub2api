@@ -217,6 +217,11 @@ func (s *AccountTestService) testClaudeAccountConnection(c *gin.Context, account
 		if mappedModel, ok := ResolveBedrockMantleModelID(account, testModelID); ok {
 			testModelID = mappedModel
 		}
+	} else if account.IsClaudePlatformAWS() {
+		// Claude Platform on AWS (aws-external-anthropic) is native Anthropic
+		// protocol with a plain API key, not SigV4 — handled by the native path
+		// below. Apply account model mapping like the gateway forward path.
+		testModelID = account.GetMappedModel(testModelID)
 	} else if account.IsBedrock() {
 		// SigV4 / Bedrock API Key accounts use the InvokeModel test path.
 		return s.testBedrockAccountConnection(c, ctx, account, testModelID)
@@ -263,6 +268,14 @@ func (s *AccountTestService) testClaudeAccountConnection(c *gin.Context, account
 			return s.sendErrorAndEnd(c, "No API key available")
 		}
 		apiURL = BuildBedrockMantleMessagesURL(bedrockMantleRegion(account))
+	} else if account.IsClaudePlatformAWS() {
+		// Claude Platform on AWS: native Anthropic protocol, plain API key + workspace id.
+		useBearer = false
+		authToken = account.GetCredential("api_key")
+		if authToken == "" {
+			return s.sendErrorAndEnd(c, "No API key available")
+		}
+		apiURL = BuildClaudePlatformAWSMessagesURL(claudePlatformAWSRegion(account))
 	} else {
 		return s.sendErrorAndEnd(c, fmt.Sprintf("Unsupported account type: %s", account.Type))
 	}
@@ -305,6 +318,13 @@ func (s *AccountTestService) testClaudeAccountConnection(c *gin.Context, account
 	} else {
 		req.Header.Set("anthropic-beta", claude.APIKeyBetaHeader)
 		req.Header.Set("x-api-key", authToken)
+	}
+
+	// Claude Platform on AWS requires the workspace id header on every request.
+	if account.IsClaudePlatformAWS() {
+		if ws := claudePlatformAWSWorkspaceID(account); ws != "" {
+			req.Header.Set("anthropic-workspace-id", ws)
+		}
 	}
 
 	// Force context-1m beta when the account is configured to require it,
