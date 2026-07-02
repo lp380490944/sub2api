@@ -1680,8 +1680,8 @@ func (h *GatewayHandler) handleFailoverExhausted(c *gin.Context, failoverErr *se
 		return
 	}
 
-	// 使用默认的错误映射
-	status, errType, errMsg := h.mapUpstreamError(statusCode)
+	// 使用默认的错误映射（Bedrock 区域池全部耗尽时，把 429 软化为可重试的 503 overloaded）
+	status, errType, errMsg := h.mapUpstreamError(softenBedrockExhaustStatus(statusCode, failoverErr.SoftRateLimitOnExhaust))
 	h.handleStreamingAwareError(c, status, errType, errMsg, streamStarted)
 }
 
@@ -1690,6 +1690,15 @@ func (h *GatewayHandler) handleFailoverExhaustedSimple(c *gin.Context, statusCod
 	status, errType, errMsg := h.mapUpstreamError(statusCode)
 	service.SetOpsUpstreamError(c, statusCode, errMsg, "")
 	h.handleStreamingAwareError(c, status, errType, errMsg, streamStarted)
+}
+
+// softenBedrockExhaustStatus remaps a Bedrock pool 429 at exhaustion to 529 so mapUpstreamError
+// yields a retryable 503 overloaded_error — clients back off instead of seeing a hard 429.
+func softenBedrockExhaustStatus(statusCode int, soft bool) int {
+	if soft && statusCode == http.StatusTooManyRequests {
+		return 529
+	}
+	return statusCode
 }
 
 func (h *GatewayHandler) mapUpstreamError(statusCode int) (int, string, string) {

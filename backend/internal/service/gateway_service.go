@@ -639,6 +639,7 @@ type UpstreamFailoverError struct {
 	ForceCacheBilling      bool        // Antigravity 粘性会话切换时设为 true
 	RetryableOnSameAccount bool        // 临时性错误（如 Google 间歇性 400、空响应），应在同一账号上重试 N 次再切换
 	QuotaExhausted         bool        // 上游账号配额/积分/余额耗尽，应清除粘性会话绑定
+	SoftRateLimitOnExhaust bool        // Bedrock 区域池：全部耗尽时把 429 呈现为可重试的 503 overloaded，避免客户端看到硬限流
 }
 
 func (e *UpstreamFailoverError) Error() string {
@@ -6411,6 +6412,7 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 				StatusCode:             resp.StatusCode,
 				ResponseBody:           respBody,
 				RetryableOnSameAccount: account.IsPoolMode() && account.IsPoolModeRetryableStatus(resp.StatusCode),
+				SoftRateLimitOnExhaust: account.IsBedrockAPIKey() && resp.StatusCode == http.StatusTooManyRequests,
 			}
 		}
 		return s.handleRetryExhaustedError(ctx, resp, c, account)
@@ -6445,6 +6447,7 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 			StatusCode:             resp.StatusCode,
 			ResponseBody:           respBody,
 			RetryableOnSameAccount: account.IsPoolMode() && account.IsPoolModeRetryableStatus(resp.StatusCode),
+			SoftRateLimitOnExhaust: account.IsBedrockAPIKey() && resp.StatusCode == http.StatusTooManyRequests,
 		}
 	}
 	if resp.StatusCode >= 400 {
@@ -6821,6 +6824,7 @@ func (s *GatewayService) forwardAnthropicAPIKeyPassthroughWithInput(
 				StatusCode:             resp.StatusCode,
 				ResponseBody:           respBody,
 				RetryableOnSameAccount: account.IsPoolMode() && account.IsPoolModeRetryableStatus(resp.StatusCode),
+				SoftRateLimitOnExhaust: account.IsBedrockAPIKey() && resp.StatusCode == http.StatusTooManyRequests,
 			}
 		}
 		return s.handleRetryExhaustedError(ctx, resp, c, account)
@@ -6855,6 +6859,7 @@ func (s *GatewayService) forwardAnthropicAPIKeyPassthroughWithInput(
 			StatusCode:             resp.StatusCode,
 			ResponseBody:           respBody,
 			RetryableOnSameAccount: account.IsPoolMode() && account.IsPoolModeRetryableStatus(resp.StatusCode),
+			SoftRateLimitOnExhaust: account.IsBedrockAPIKey() && resp.StatusCode == http.StatusTooManyRequests,
 		}
 	}
 
@@ -7753,6 +7758,7 @@ func (s *GatewayService) handleBedrockUpstreamErrors(
 				StatusCode:             resp.StatusCode,
 				ResponseBody:           respBody,
 				RetryableOnSameAccount: account.IsPoolMode() && account.IsPoolModeRetryableStatus(resp.StatusCode),
+				SoftRateLimitOnExhaust: account.IsBedrockAPIKey() && resp.StatusCode == http.StatusTooManyRequests,
 			}
 		}
 		return s.handleRetryExhaustedError(ctx, resp, c, account)
@@ -7777,6 +7783,7 @@ func (s *GatewayService) handleBedrockUpstreamErrors(
 			StatusCode:             resp.StatusCode,
 			ResponseBody:           respBody,
 			RetryableOnSameAccount: account.IsPoolMode() && account.IsPoolModeRetryableStatus(resp.StatusCode),
+			SoftRateLimitOnExhaust: account.IsBedrockAPIKey() && resp.StatusCode == http.StatusTooManyRequests,
 		}
 	}
 
