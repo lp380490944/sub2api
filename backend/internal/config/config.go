@@ -817,6 +817,10 @@ type GatewayConfig struct {
 	MaxAccountSwitches int `mapstructure:"max_account_switches"`
 	// Gemini 账户切换最大次数（Gemini 平台单独配置，因 API 限制更严格）
 	MaxAccountSwitchesGemini int `mapstructure:"max_account_switches_gemini"`
+	// Bedrock 区域池：遇到 429/5xx/529 立即切换区域（跳过同区域的服务内重试）
+	BedrockFastFailover bool `mapstructure:"bedrock_fast_failover"`
+	// Bedrock 区域被限流(429)且无 Retry-After 时的短冷却时间(秒)
+	BedrockThrottleCooldownSec int `mapstructure:"bedrock_throttle_cooldown_sec"`
 
 	// Antigravity 429 fallback 限流时间（分钟），解析重置时间失败时使用
 	AntigravityFallbackCooldownMinutes int `mapstructure:"antigravity_fallback_cooldown_minutes"`
@@ -1966,6 +1970,8 @@ func setDefaults() {
 	viper.SetDefault("gateway.failover_on_400", false)
 	viper.SetDefault("gateway.max_account_switches", 10)
 	viper.SetDefault("gateway.max_account_switches_gemini", 3)
+	viper.SetDefault("gateway.bedrock_fast_failover", true)
+	viper.SetDefault("gateway.bedrock_throttle_cooldown_sec", 10)
 	viper.SetDefault("gateway.force_codex_cli", false)
 	viper.SetDefault("gateway.codex_image_generation_bridge_enabled", false)
 	viper.SetDefault("gateway.openai_passthrough_allow_timeout_headers", false)

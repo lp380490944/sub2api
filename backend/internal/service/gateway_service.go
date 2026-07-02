@@ -7652,7 +7652,8 @@ func (s *GatewayService) executeBedrockUpstream(
 			return nil, fmt.Errorf("upstream request failed: %s", safeErr)
 		}
 
-		if resp.StatusCode >= 400 && resp.StatusCode != 400 && s.shouldRetryUpstreamError(account, resp.StatusCode) {
+		if resp.StatusCode >= 400 && resp.StatusCode != 400 && s.shouldRetryUpstreamError(account, resp.StatusCode) &&
+			!bedrockShouldFastFailover(account, resp.StatusCode, s.cfg != nil && s.cfg.Gateway.BedrockFastFailover) {
 			if attempt < maxRetryAttempts {
 				elapsed := time.Since(retryStart)
 				if elapsed >= maxRetryElapsed {
@@ -7701,6 +7702,25 @@ func (s *GatewayService) executeBedrockUpstream(
 		return nil, errors.New("upstream request failed: empty response")
 	}
 	return resp, nil
+}
+
+// bedrockShouldFastFailover reports whether a Bedrock apikey account should skip in-service
+// same-region retries and fail over to a different region immediately for this status.
+// Retrying the same throttled/overloaded region in a multi-region pool is futile and slow.
+func bedrockShouldFastFailover(account *Account, statusCode int, enabled bool) bool {
+	if !enabled || account == nil || !account.IsBedrockAPIKey() {
+		return false
+	}
+	switch statusCode {
+	case http.StatusTooManyRequests, // 429
+		http.StatusInternalServerError, // 500
+		http.StatusBadGateway,          // 502
+		http.StatusServiceUnavailable,  // 503
+		http.StatusGatewayTimeout,      // 504
+		529:                            // overloaded
+		return true
+	}
+	return false
 }
 
 // handleBedrockUpstreamErrors 处理 Bedrock 上游 4xx/5xx 错误（failover + 错误响应）
