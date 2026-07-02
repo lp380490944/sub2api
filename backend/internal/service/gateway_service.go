@@ -9828,6 +9828,18 @@ func (s *GatewayService) handleRetryExhaustedSideEffects(ctx context.Context, re
 	body, _ := s.readUpstreamErrorBody(resp)
 	statusCode := resp.StatusCode
 
+	// Bedrock region pool: bench a throttled region briefly so the scheduler skips it until it
+	// recovers (429 → short cooldown; 529 → standard overloaded cooldown). Other 5xx just hop.
+	if account.IsBedrockAPIKey() {
+		switch statusCode {
+		case http.StatusTooManyRequests: // 429
+			s.rateLimitService.BenchBedrockThrottle(ctx, account, resp.Header)
+		case 529:
+			s.rateLimitService.HandleUpstreamError(ctx, account, statusCode, resp.Header, body)
+		}
+		return
+	}
+
 	// OAuth/Setup Token 账号的 403：标记账号异常
 	if account.IsOAuth() && statusCode == 403 {
 		s.rateLimitService.HandleUpstreamError(ctx, account, statusCode, resp.Header, body)

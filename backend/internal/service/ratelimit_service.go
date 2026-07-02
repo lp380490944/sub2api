@@ -1080,6 +1080,59 @@ func (s *RateLimitService) get429FallbackCooldown(ctx context.Context, account *
 	return time.Duration(seconds) * time.Second, true
 }
 
+// BenchBedrockThrottle briefly marks a throttled Bedrock region as rate-limited so the
+// scheduler skips it until it recovers. Fixes the gap where an AWS ThrottlingException 429
+// (no Anthropic reset header) is never benched. Honors Retry-After, else the configured short
+// default (Gateway.BedrockThrottleCooldownSec). No-ops in pool_mode (which disables benching).
+func (s *RateLimitService) BenchBedrockThrottle(ctx context.Context, account *Account, headers http.Header) {
+	if account == nil || account.IsPoolMode() {
+		return
+	}
+	defaultSec := 10
+	if s.cfg != nil && s.cfg.Gateway.BedrockThrottleCooldownSec > 0 {
+		defaultSec = s.cfg.Gateway.BedrockThrottleCooldownSec
+	}
+	cooldown := bedrockThrottleCooldown(headers, defaultSec)
+	resetAt := time.Now().Add(cooldown)
+	s.notifyAccountSchedulingBlocked(account, resetAt, "bedrock_throttle")
+	if err := s.accountRepo.SetRateLimited(ctx, account.ID, resetAt); err != nil {
+		slog.Warn("rate_limit_set_failed", "account_id", account.ID, "error", err)
+		return
+	}
+	slog.Info("bedrock_region_throttled",
+		"account_id", account.ID, "region", account.GetCredential("aws_region"), "cooldown", cooldown.String())
+}
+
+// bedrockThrottleCooldown returns how long to bench a throttled Bedrock region: Retry-After
+// (delta-seconds) when present, else defaultSec. Clamped to [1, 3600] seconds.
+func bedrockThrottleCooldown(headers http.Header, defaultSec int) time.Duration {
+	sec := defaultSec
+	if ra := parseRetryAfterSeconds(headers.Get("Retry-After")); ra > 0 {
+		sec = ra
+	}
+	if sec < 1 {
+		sec = 1
+	}
+	if sec > 3600 {
+		sec = 3600
+	}
+	return time.Duration(sec) * time.Second
+}
+
+// parseRetryAfterSeconds parses a Retry-After header expressed in delta-seconds.
+// Returns 0 for empty / non-integer / negative values (HTTP-date form is not honored).
+func parseRetryAfterSeconds(v string) int {
+	v = strings.TrimSpace(v)
+	if v == "" {
+		return 0
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n < 0 {
+		return 0
+	}
+	return n
+}
+
 func clampRateLimit429CooldownSeconds(seconds int) int {
 	if seconds < 1 {
 		return 1
