@@ -164,7 +164,7 @@ publish_release() {
     print_success "Released $version"
     echo ""
     echo "  To upgrade a production server, run there:"
-    echo "  curl -sSL https://raw.githubusercontent.com/qiangweihewu/sub2api/i18n-seo/deploy/install-custom.sh | sudo bash -s -- upgrade"
+    echo "  curl -sSL https://raw.githubusercontent.com/qiangweihewu/sub2api/main/deploy/install-custom.sh | sudo bash -s -- upgrade"
     echo ""
 }
 
