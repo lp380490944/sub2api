@@ -125,6 +125,12 @@
                       </span>
                       <span class="flex-1 text-left">{{ t('admin.errorPassthrough.title') }}</span>
                     </button>
+                    <button class="account-tools-menu-item" @click="openBatchBedrock">
+                      <span class="account-tools-menu-icon bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-300">
+                        <Icon name="cloud" size="sm" />
+                      </span>
+                      <span class="flex-1 text-left">{{ t('admin.accounts.batchBedrock.menuTitle') }}</span>
+                    </button>
                     <button class="account-tools-menu-item" @click="openTLSFingerprintProfiles">
                       <span class="account-tools-menu-icon bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-200">
                         <Icon name="lock" size="sm" />
@@ -377,6 +383,7 @@
     <ScheduledTestsPanel :show="showSchedulePanel" :account-id="scheduleAcc?.id ?? null" :model-options="scheduleModelOptions" @close="closeSchedulePanel" />
     <AccountActionMenu :show="menu.show" :account="menu.acc" :position="menu.pos" @close="menu.show = false" @test="handleTest" @stats="handleViewStats" @schedule="handleSchedule" @reauth="handleReAuth" @refresh-token="handleRefresh" @recover-state="handleRecoverState" @reset-quota="handleResetQuota" @set-privacy="handleSetPrivacy" />
     <SyncFromCrsModal :show="showSync" @close="showSync = false" @synced="reload" />
+    <BatchImportBedrockModal :show="showBatchBedrock" :groups="groups" @close="showBatchBedrock = false" @created="reload" />
     <ImportDataModal :show="showImportData" @close="showImportData = false" @imported="handleDataImported" />
     <BulkEditAccountModal
       :show="showBulkEdit"
@@ -418,7 +425,7 @@ import DataTable from '@/components/common/DataTable.vue'
 import HelpTooltip from '@/components/common/HelpTooltip.vue'
 import Pagination from '@/components/common/Pagination.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
-import { CreateAccountModal, EditAccountModal, BulkEditAccountModal, SyncFromCrsModal, TempUnschedStatusModal } from '@/components/account'
+import { CreateAccountModal, EditAccountModal, BulkEditAccountModal, SyncFromCrsModal, TempUnschedStatusModal, BatchImportBedrockModal } from '@/components/account'
 import AccountTableActions from '@/components/admin/account/AccountTableActions.vue'
 import AccountTableFilters from '@/components/admin/account/AccountTableFilters.vue'
 import AccountBulkActionsBar from '@/components/admin/account/AccountBulkActionsBar.vue'
@@ -494,6 +501,7 @@ const showCreate = ref(false)
 const showEdit = ref(false)
 const showSync = ref(false)
 const showImportData = ref(false)
+const showBatchBedrock = ref(false)
 const showExportDataDialog = ref(false)
 const includeProxyOnExport = ref(true)
 const showBulkEdit = ref(false)
@@ -875,6 +883,7 @@ const isAnyModalOpen = computed(() => {
     showEdit.value ||
     showSync.value ||
     showImportData.value ||
+    showBatchBedrock.value ||
     showExportDataDialog.value ||
     showBulkEdit.value ||
     showTempUnsched.value ||
@@ -1007,6 +1016,11 @@ const openSyncFromCrs = () => {
 const openImportData = () => {
   closeAccountToolsDropdown()
   showImportData.value = true
+}
+
+const openBatchBedrock = () => {
+  closeAccountToolsDropdown()
+  showBatchBedrock.value = true
 }
 
 const openExportDataDialogFromMenu = () => {
