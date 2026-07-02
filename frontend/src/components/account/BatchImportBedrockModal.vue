@@ -181,7 +181,7 @@ const selectedProfiles = computed<BedrockProfile[]>(() => {
   if (profileGlobal.value) p.push('global')
   return p
 })
-const willCreateCount = computed(() => selectedRegions.value.length * selectedProfiles.value.length)
+const willCreateCount = computed(() => expandBedrockBatch(buildConfig()).length)
 const geoGroupIds = computed<number[]>(() => {
   const id = splitGroups.value ? geoGroupId.value : groupId.value
   return id ? [id] : []
