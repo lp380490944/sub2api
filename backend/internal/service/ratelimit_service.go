@@ -998,6 +998,13 @@ func (s *RateLimitService) handle429(ctx context.Context, account *Account, head
 			}
 		}
 
+		// Bedrock 区域池：AWS ThrottlingException 429 无 Anthropic 重置头。短暂冷却该区域，
+		// 否则调度器会持续重选被限流的区域。（实际路径：handleFailoverSideEffects → HandleUpstreamError → 此处）
+		if account.IsBedrockAPIKey() {
+			s.BenchBedrockThrottle(ctx, account, headers)
+			return
+		}
+
 		// Anthropic 平台：没有限流重置时间的 429 可能是非真实限流（如 Extra usage required），
 		// 不标记账号限流状态，直接透传错误给客户端
 		if account.Platform == PlatformAnthropic {
