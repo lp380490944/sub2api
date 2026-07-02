@@ -232,20 +232,15 @@ func (s *AccountTestService) testClaudeAccountConnection(c *gin.Context, account
 
 	// Determine authentication method and API URL
 	var authToken string
-	var useBearer bool
 	var apiURL string
 
 	if account.IsOAuth() {
-		// OAuth or Setup Token - use Bearer token
-		useBearer = true
 		apiURL = testClaudeAPIURL
 		authToken = account.GetCredential("access_token")
 		if authToken == "" {
 			return s.sendErrorAndEnd(c, "No access token available")
 		}
 	} else if account.Type == "apikey" {
-		// API Key - use x-api-key header
-		useBearer = false
 		authToken = account.GetCredential("api_key")
 		if authToken == "" {
 			return s.sendErrorAndEnd(c, "No API key available")
@@ -262,7 +257,6 @@ func (s *AccountTestService) testClaudeAccountConnection(c *gin.Context, account
 		apiURL = strings.TrimSuffix(normalizedBaseURL, "/") + "/v1/messages"
 	} else if account.IsBedrockMantle() {
 		// Bedrock Mantle: native Anthropic protocol at the Mantle endpoint, plain API key.
-		useBearer = false
 		authToken = account.GetCredential("api_key")
 		if authToken == "" {
 			return s.sendErrorAndEnd(c, "No API key available")
@@ -270,7 +264,6 @@ func (s *AccountTestService) testClaudeAccountConnection(c *gin.Context, account
 		apiURL = BuildBedrockMantleMessagesURL(bedrockMantleRegion(account))
 	} else if account.IsClaudePlatformAWS() {
 		// Claude Platform on AWS: native Anthropic protocol, plain API key + workspace id.
-		useBearer = false
 		authToken = account.GetCredential("api_key")
 		if authToken == "" {
 			return s.sendErrorAndEnd(c, "No API key available")
@@ -312,12 +305,12 @@ func (s *AccountTestService) testClaudeAccountConnection(c *gin.Context, account
 	}
 
 	// Set authentication header
-	if useBearer {
+	if account.IsOAuth() {
 		req.Header.Set("anthropic-beta", claude.DefaultBetaHeader)
 		req.Header.Set("Authorization", "Bearer "+authToken)
 	} else {
 		req.Header.Set("anthropic-beta", claude.APIKeyBetaHeader)
-		req.Header.Set("x-api-key", authToken)
+		setAnthropicAPIKeyAuthHeader(req.Header, account, authToken)
 	}
 
 	// Claude Platform on AWS requires the workspace id header on every request.
