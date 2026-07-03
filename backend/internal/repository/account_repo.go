@@ -467,7 +467,7 @@ func (r *accountRepository) List(ctx context.Context, params pagination.Paginati
 	return r.ListWithFilters(ctx, params, "", "", "", "", 0, "")
 }
 
-func (r *accountRepository) ListWithFilters(ctx context.Context, params pagination.PaginationParams, platform, accountType, status, search string, groupID int64, privacyMode string) ([]service.Account, *pagination.PaginationResult, error) {
+func (r *accountRepository) accountListFilteredQuery(platform, accountType, status, search string, groupID int64, privacyMode string) *dbent.AccountQuery {
 	q := r.client.Account.Query()
 
 	if platform != "" {
@@ -560,6 +560,11 @@ func (r *accountRepository) ListWithFilters(ctx context.Context, params paginati
 		}))
 	}
 
+	return q
+}
+
+func (r *accountRepository) ListWithFilters(ctx context.Context, params pagination.PaginationParams, platform, accountType, status, search string, groupID int64, privacyMode string) ([]service.Account, *pagination.PaginationResult, error) {
+	q := r.accountListFilteredQuery(platform, accountType, status, search, groupID, privacyMode)
 	// Clone before Count so interceptor-appended predicates (SoftDeleteMixin's
 	// deleted_at IS NULL) don't accumulate on the shared builder and pollute the
 	// subsequent list query. Same pattern used in group_repo/promo_code_repo/user_repo
@@ -586,6 +591,49 @@ func (r *accountRepository) ListWithFilters(ctx context.Context, params paginati
 		return nil, nil, err
 	}
 	return outAccounts, paginationResultFromTotal(int64(total), params), nil
+}
+
+func (r *accountRepository) ListAllWithFilters(ctx context.Context, platform, accountType, status, search string, groupID int64, privacyMode string) ([]service.Account, error) {
+	accounts, err := r.accountListFilteredQuery(platform, accountType, status, search, groupID, privacyMode).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return r.accountsToService(ctx, accounts)
+}
+
+func (r *accountRepository) ListOpsAccountsForStats(ctx context.Context, platformFilter string, groupIDFilter *int64) ([]service.Account, error) {
+	if r == nil || r.client == nil {
+		return []service.Account{}, nil
+	}
+
+	q := r.client.Account.Query()
+	if platformFilter = strings.TrimSpace(platformFilter); platformFilter != "" {
+		q = q.Where(dbaccount.PlatformEQ(platformFilter))
+	}
+	if groupIDFilter != nil && *groupIDFilter > 0 {
+		q = q.Where(dbaccount.HasAccountGroupsWith(dbaccountgroup.GroupIDEQ(*groupIDFilter)))
+	}
+
+	accounts, err := q.
+		Select(
+			dbaccount.FieldID,
+			dbaccount.FieldName,
+			dbaccount.FieldPlatform,
+			dbaccount.FieldConcurrency,
+			dbaccount.FieldLoadFactor,
+			dbaccount.FieldStatus,
+			dbaccount.FieldErrorMessage,
+			dbaccount.FieldSchedulable,
+			dbaccount.FieldRateLimitResetAt,
+			dbaccount.FieldOverloadUntil,
+			dbaccount.FieldTempUnschedulableUntil,
+		).
+		Order(dbent.Asc(dbaccount.FieldID)).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return r.accountsToService(ctx, accounts)
 }
 
 func accountListOrder(params pagination.PaginationParams) []func(*entsql.Selector) {
