@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/png" href="/logo.png" />
+
+    <title>Fix Anthropic API 429 "Too Many Requests" — Claude Rate Limits Explained (2026) | TokenProvider</title>
+    <meta name="description" content="Why the Claude / Anthropic API returns 429 too many requests, how RPM / ITPM / OTPM tier limits work, and concrete fixes: respect retry-after, exponential backoff, lower concurrency, prompt caching, and smart routing across capacity." />
+    <meta name="keywords" content="anthropic api 429, claude api rate limit, claude api too many requests, claude code rate limit, anthropic 429 fix, claude rate limit retry-after" />
+    <meta name="robots" content="index,follow" />
+    <meta name="theme-color" content="#14b8a6" />
+
+    <link rel="canonical" href="https://tokenprovider.store/en/guides/claude-api-429-rate-limit-fix.html" />
+    <link rel="alternate" hreflang="en" href="https://tokenprovider.store/en/guides/claude-api-429-rate-limit-fix.html" />
+    <link rel="alternate" hreflang="x-default" href="https://tokenprovider.store/en/guides/claude-api-429-rate-limit-fix.html" />
+
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content="https://tokenprovider.store/en/guides/claude-api-429-rate-limit-fix.html" />
+    <meta property="og:title" content="Fix Anthropic API 429 — Claude Rate Limits Explained (2026)" />
+    <meta property="og:description" content="What a 429 means on the Claude API and how to stop hitting it: retry-after, backoff, concurrency, caching, and routing across capacity." />
+    <meta property="og:image" content="https://tokenprovider.store/logo.png" />
+    <meta property="og:site_name" content="TokenProvider" />
+    <meta property="og:locale" content="en_US" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Fix Anthropic API 429 — Claude Rate Limits Explained (2026)" />
+    <meta name="twitter:description" content="What a 429 means on the Claude API and how to stop hitting it." />
+    <meta name="twitter:image" content="https://tokenprovider.store/logo.png" />
+
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "TechArticle",
+      "headline": "Fix Anthropic API 429 Too Many Requests: Claude Rate Limits Explained",
+      "description": "How Claude / Anthropic API rate limits work and how to stop hitting 429 errors.",
+      "inLanguage": "en",
+      "datePublished": "2026-06-26",
+      "dateModified": "2026-06-26",
+      "author": { "@type": "Organization", "name": "TokenProvider" },
+      "publisher": {
+        "@type": "Organization",
+        "name": "TokenProvider",
+        "logo": { "@type": "ImageObject", "url": "https://tokenprovider.store/logo.png" }
+      }
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "What does a 429 error mean on the Claude API?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "A 429 means you exceeded an Anthropic rate limit — requests per minute (RPM), input tokens per minute (ITPM), or output tokens per minute (OTPM) for your usage tier. The response includes a retry-after header telling you how long to wait."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Should I retry immediately after a 429?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No. Read the retry-after header and wait that long, then use exponential backoff with jitter for repeated failures. Immediate retries make the limit worse and can extend the cooldown."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Does prompt caching help with rate limits?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. Cached prompt prefixes are billed and counted differently, lowering the input tokens that count toward ITPM, which reduces how quickly you hit the limit on repetitive context."
+          }
+        }
+      ]
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "TokenProvider", "item": "https://tokenprovider.store/en.html" },
+        { "@type": "ListItem", "position": 2, "name": "Fix Anthropic API 429 rate limits", "item": "https://tokenprovider.store/en/guides/claude-api-429-rate-limit-fix.html" }
+      ]
+    }
+    </script>
+
+    <link rel="stylesheet" href="/assets/seo.css" />
+  </head>
+  <body>
+    <div class="seo-bg-decor"></div>
+
+    <header class="seo-header">
+      <div class="seo-container-wide">
+        <nav class="seo-nav">
+          <a class="seo-logo" href="/en.html">
+            <img src="/logo.png" alt="TokenProvider logo" width="36" height="36" />
+            <span class="seo-logo-text">TokenProvider</span>
+          </a>
+          <div class="seo-nav-links">
+            <a class="seo-nav-link" href="/en.html">Home</a>
+            <a class="seo-nav-link" href="/login">Log in</a>
+            <a class="seo-btn-primary" href="/register">Sign up →</a>
+          </div>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <div class="seo-container">
+        <article>
+          <h1>Fix Anthropic API 429 "Too Many Requests"</h1>
+          <p class="seo-lede">
+            A <code>429</code> from the Claude / Anthropic API means you crossed a rate limit — not
+            that anything is broken. This page explains the three limits that trigger it, the right
+            way to recover, and how to stop hitting it in the first place.
+          </p>
+
+          <div class="seo-tldr">
+            <p><strong>Fast answer:</strong> read the <code>retry-after</code> header and wait that
+            long, then retry with exponential backoff + jitter. To stop recurring 429s: lower
+            concurrency, enable prompt caching, batch non-urgent calls, and spread load across more
+            upstream capacity.</p>
+          </div>
+
+          <h2>The three limits behind a 429</h2>
+          <p>Anthropic enforces per-minute limits that scale with your usage tier. Any one of them
+          can return a 429:</p>
+          <div class="seo-table-wrap">
+            <table class="seo-table">
+              <thead><tr><th>Limit</th><th>What it caps</th><th>Typical trigger</th></tr></thead>
+              <tbody>
+                <tr><td><strong>RPM</strong></td><td>Requests per minute</td><td>Many small calls — agent loops, autocomplete</td></tr>
+                <tr><td><strong>ITPM</strong></td><td>Input tokens per minute</td><td>Large context re-sent every turn</td></tr>
+                <tr><td><strong>OTPM</strong></td><td>Output tokens per minute</td><td>Long generations in parallel</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>The 429 response carries a <code>retry-after</code> header (seconds). Honor it — it is
+          the server telling you exactly when the window resets.</p>
+
+          <h2>Recover correctly: retry-after + backoff</h2>
+          <p>The single most common mistake is retrying instantly in a loop, which keeps you pinned
+          against the limit. Do this instead:</p>
+<pre><code>import time, random, httpx
+
+def call_with_backoff(client, payload, max_retries=6):
+    delay = 1.0
+    for attempt in range(max_retries):
+        r = client.post("/v1/messages", json=payload)
+        if r.status_code != 429:
+            return r
+        # Prefer the server's retry-after; fall back to exponential backoff + jitter
+        wait = float(r.headers.get("retry-after", delay))
+        time.sleep(wait + random.uniform(0, 0.5))
+        delay = min(delay * 2, 30)
+    raise RuntimeError("Still rate-limited after retries")</code></pre>
+
+          <h2>Stop hitting it: five durable fixes</h2>
+          <ol class="seo-steps">
+            <li>
+              <h3>Lower concurrency</h3>
+              <p>Cap parallel in-flight requests (e.g. a semaphore of 4–8). Bursts are what trip RPM;
+              a steady stream rarely does.</p>
+            </li>
+            <li>
+              <h3>Enable prompt caching</h3>
+              <p>Cache stable prefixes (system prompt, project context). Cached input counts
+              differently toward ITPM, so repetitive context stops eating your limit.</p>
+            </li>
+            <li>
+              <h3>Batch non-urgent work</h3>
+              <p>Move bulk or background jobs to an asynchronous/batch path so they don't compete
+              with interactive traffic for the same per-minute window.</p>
+            </li>
+            <li>
+              <h3>Trim the context you resend</h3>
+              <p>Agentic tools (Cline, Cursor, Claude Code) resend context each turn. Smaller context
+              = fewer input tokens per minute. See <a href="/en/guides/cursor-token-usage-reduce.html">reducing Cursor token usage</a>.</p>
+            </li>
+            <li>
+              <h3>Spread load across more capacity</h3>
+              <p>A single key shares one tier's limits. Routing requests across a larger pool of
+              upstream capacity with automatic failover raises your effective ceiling — this is what
+              a smart gateway does, and why the same workload sees fewer 429s through one.</p>
+            </li>
+          </ol>
+
+          <h2>429 in Claude Code specifically</h2>
+          <p>Claude Code is bursty: it fires tool calls and follow-ups rapidly. If you see 429s mid-task,
+          they're usually RPM, not balance. Backoff is built in, but trimming auto-read files and
+          routing through capacity with failover both help. Setup: <a href="/en/guides/claude-code-setup.html">Claude Code with a custom endpoint</a>.</p>
+
+          <h2>FAQ</h2>
+          <div class="seo-faq">
+            <div class="seo-faq-item">
+              <h3>What does a 429 error mean on the Claude API?</h3>
+              <p>You exceeded a per-minute rate limit (RPM, ITPM, or OTPM) for your usage tier. The
+              <code>retry-after</code> header says how long until the window resets.</p>
+            </div>
+            <div class="seo-faq-item">
+              <h3>Should I retry immediately?</h3>
+              <p>No — wait for <code>retry-after</code>, then use exponential backoff with jitter.
+              Immediate retries extend the cooldown.</p>
+            </div>
+            <div class="seo-faq-item">
+              <h3>Does a gateway remove rate limits?</h3>
+              <p>No service can remove Anthropic's limits. A gateway that load-balances across more
+              upstream capacity with failover raises the <em>effective</em> ceiling, so the same
+              workload hits 429 less often.</p>
+            </div>
+          </div>
+
+          <section class="seo-cta-block">
+            <h2 class="seo-mt-0">Fewer 429s — one endpoint, routed across capacity</h2>
+            <p>$1 minimum top-up, pay per token, cancel anytime.</p>
+            <a class="seo-btn-cta" href="/register">Sign up free →</a>
+            <a class="seo-btn-ghost" href="/login">Already a member</a>
+          </section>
+
+          <section class="seo-related">
+            <h2>Related guides</h2>
+            <ul class="seo-related-list">
+              <li><a href="/en/guides/cursor-token-usage-reduce.html"><strong>Reduce Cursor Token Usage</strong><span>Cut context bloat</span></a></li>
+              <li><a href="/en/tools/llm-api-cost-calculator.html"><strong>LLM API Cost Calculator</strong><span>Model up your spend</span></a></li>
+              <li><a href="/en/guides/roo-code-claude-api.html"><strong>Roo Code Custom LLM Setup</strong><span>Per-mode models</span></a></li>
+              <li><a href="/en/compare/claude-vs-chatgpt-api.html"><strong>Claude vs ChatGPT API</strong><span>Pick the right model</span></a></li>
+            </ul>
+          </section>
+        </article>
+      </div>
+    </main>
+
+    <footer class="seo-footer">
+      <div class="seo-container">
+        <p>
+          <a href="/en.html">Home</a> ·
+          <a href="/login">Log in</a> ·
+          <a href="/register">Sign up</a>
+        </p>
+        <p>© TokenProvider · Independent third-party Claude / Claude Code / ChatGPT / Gemini gateway · Not affiliated with Anthropic, OpenAI, or Google</p>
+      </div>
+    </footer>
+  </body>
+</html>

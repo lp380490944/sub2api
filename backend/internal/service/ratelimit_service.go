@@ -185,6 +185,16 @@ func (s *RateLimitService) HandleUpstreamError(ctx context.Context, account *Acc
 		return true
 	}
 
+	// Anthropic official 5h / 7d window exhaustion is a hard account limit.
+	// It must take precedence over user-configured 429 temp-unsched rules,
+	// otherwise a broad "rate limit" keyword rule can shorten a multi-hour
+	// cooldown to a local temporary pause.
+	if statusCode == http.StatusTooManyRequests && account.Platform == PlatformAnthropic {
+		if s.persistAnthropicExhaustedWindowLimit(ctx, account, headers) {
+			return false
+		}
+	}
+
 	// 先尝试临时不可调度规则（401除外）
 	// 如果匹配成功，直接返回，不执行后续禁用逻辑
 	if statusCode != 401 {
@@ -988,6 +998,13 @@ func (s *RateLimitService) handle429(ctx context.Context, account *Account, head
 			}
 		}
 
+		// Bedrock 区域池：AWS ThrottlingException 429 无 Anthropic 重置头。短暂冷却该区域，
+		// 否则调度器会持续重选被限流的区域。（实际路径：handleFailoverSideEffects → HandleUpstreamError → 此处）
+		if account.IsBedrockAPIKey() {
+			s.BenchBedrockThrottle(ctx, account, headers)
+			return
+		}
+
 		// Anthropic 平台：没有限流重置时间的 429 可能是非真实限流（如 Extra usage required），
 		// 不标记账号限流状态，直接透传错误给客户端
 		if account.Platform == PlatformAnthropic {
@@ -1070,6 +1087,59 @@ func (s *RateLimitService) get429FallbackCooldown(ctx context.Context, account *
 	return time.Duration(seconds) * time.Second, true
 }
 
+// BenchBedrockThrottle briefly marks a throttled Bedrock region as rate-limited so the
+// scheduler skips it until it recovers. Fixes the gap where an AWS ThrottlingException 429
+// (no Anthropic reset header) is never benched. Honors Retry-After, else the configured short
+// default (Gateway.BedrockThrottleCooldownSec). No-ops in pool_mode (which disables benching).
+func (s *RateLimitService) BenchBedrockThrottle(ctx context.Context, account *Account, headers http.Header) {
+	if account == nil || account.IsPoolMode() {
+		return
+	}
+	defaultSec := 10
+	if s.cfg != nil && s.cfg.Gateway.BedrockThrottleCooldownSec > 0 {
+		defaultSec = s.cfg.Gateway.BedrockThrottleCooldownSec
+	}
+	cooldown := bedrockThrottleCooldown(headers, defaultSec)
+	resetAt := time.Now().Add(cooldown)
+	s.notifyAccountSchedulingBlocked(account, resetAt, "bedrock_throttle")
+	if err := s.accountRepo.SetRateLimited(ctx, account.ID, resetAt); err != nil {
+		slog.Warn("rate_limit_set_failed", "account_id", account.ID, "error", err)
+		return
+	}
+	slog.Info("bedrock_region_throttled",
+		"account_id", account.ID, "region", account.GetCredential("aws_region"), "cooldown", cooldown.String())
+}
+
+// bedrockThrottleCooldown returns how long to bench a throttled Bedrock region: Retry-After
+// (delta-seconds) when present, else defaultSec. Clamped to [1, 3600] seconds.
+func bedrockThrottleCooldown(headers http.Header, defaultSec int) time.Duration {
+	sec := defaultSec
+	if ra := parseRetryAfterSeconds(headers.Get("Retry-After")); ra > 0 {
+		sec = ra
+	}
+	if sec < 1 {
+		sec = 1
+	}
+	if sec > 3600 {
+		sec = 3600
+	}
+	return time.Duration(sec) * time.Second
+}
+
+// parseRetryAfterSeconds parses a Retry-After header expressed in delta-seconds.
+// Returns 0 for empty / non-integer / negative values (HTTP-date form is not honored).
+func parseRetryAfterSeconds(v string) int {
+	v = strings.TrimSpace(v)
+	if v == "" {
+		return 0
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n < 0 {
+		return 0
+	}
+	return n
+}
+
 func clampRateLimit429CooldownSeconds(seconds int) int {
 	if seconds < 1 {
 		return 1
@@ -1136,6 +1206,115 @@ func (s *RateLimitService) calculateOpenAI429ResetTime(headers http.Header) *tim
 type anthropic429Result struct {
 	resetAt       time.Time  // The correct reset time to use for SetRateLimited
 	fiveHourReset *time.Time // 5h window reset timestamp (for session window calculation), nil if not available
+}
+
+type anthropicWindowLimit struct {
+	window  string
+	resetAt time.Time
+	reason  string
+}
+
+func selectAnthropicExhaustedWindow(headers http.Header, now time.Time) *anthropicWindowLimit {
+	reset5h, ok5hReset := parseAnthropicWindowReset(headers, "5h", now)
+	reset7d, ok7dReset := parseAnthropicWindowReset(headers, "7d", now)
+
+	exceeded5h := isAnthropic5hRejected(headers) || isAnthropicWindowExceeded(headers, "5h")
+	exceeded7d := isAnthropicWindowExceeded(headers, "7d")
+
+	if exceeded7d && ok7dReset {
+		return &anthropicWindowLimit{
+			window:  "7d",
+			resetAt: reset7d,
+			reason:  "anthropic_7d_window_exhausted",
+		}
+	}
+	if exceeded5h && ok5hReset {
+		return &anthropicWindowLimit{
+			window:  "5h",
+			resetAt: reset5h,
+			reason:  "anthropic_5h_window_exhausted",
+		}
+	}
+	return nil
+}
+
+func isAnthropic5hRejected(headers http.Header) bool {
+	return strings.EqualFold(strings.TrimSpace(headers.Get("anthropic-ratelimit-unified-5h-status")), "rejected")
+}
+
+func parseAnthropicWindowReset(headers http.Header, window string, now time.Time) (time.Time, bool) {
+	raw := strings.TrimSpace(headers.Get("anthropic-ratelimit-unified-" + window + "-reset"))
+	if raw == "" {
+		return time.Time{}, false
+	}
+	ts, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil {
+		return time.Time{}, false
+	}
+	if ts > 1e11 {
+		ts = ts / 1000
+	}
+	resetAt := time.Unix(ts, 0)
+	if !resetAt.After(now) {
+		return time.Time{}, false
+	}
+
+	maxAge := 8 * 24 * time.Hour
+	if window == "5h" {
+		maxAge = 6 * time.Hour
+	}
+	if resetAt.After(now.Add(maxAge)) {
+		return time.Time{}, false
+	}
+	return resetAt, true
+}
+
+func shouldPersistAnthropicWindowLimit(account *Account, limit *anthropicWindowLimit, now time.Time) bool {
+	if account == nil || limit == nil || !limit.resetAt.After(now) {
+		return false
+	}
+	if account.RateLimitResetAt == nil {
+		return true
+	}
+	if !account.RateLimitResetAt.After(now) {
+		return true
+	}
+	return limit.resetAt.After(*account.RateLimitResetAt)
+}
+
+func (s *RateLimitService) persistAnthropicExhaustedWindowLimit(ctx context.Context, account *Account, headers http.Header) bool {
+	if s == nil || s.accountRepo == nil || account == nil {
+		return false
+	}
+	now := time.Now()
+	limit := selectAnthropicExhaustedWindow(headers, now)
+	if limit == nil {
+		return false
+	}
+	if !shouldPersistAnthropicWindowLimit(account, limit, now) {
+		slog.Info("anthropic_window_rate_limit_kept",
+			"account_id", account.ID,
+			"window", limit.window,
+			"reset_at", limit.resetAt,
+			"existing_reset_at", account.RateLimitResetAt)
+		return true
+	}
+
+	s.notifyAccountSchedulingBlocked(account, limit.resetAt, limit.reason)
+	if err := s.accountRepo.SetRateLimited(ctx, account.ID, limit.resetAt); err != nil {
+		slog.Warn("anthropic_window_rate_limit_set_failed",
+			"account_id", account.ID,
+			"window", limit.window,
+			"reset_at", limit.resetAt,
+			"error", err)
+		return true
+	}
+	slog.Info("anthropic_window_rate_limited",
+		"account_id", account.ID,
+		"window", limit.window,
+		"reset_at", limit.resetAt,
+		"reset_in", time.Until(limit.resetAt).Truncate(time.Second))
+	return true
 }
 
 // calculateAnthropic429ResetTime parses Anthropic's per-window rate-limit headers

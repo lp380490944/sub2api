@@ -68,31 +68,31 @@
       "mainEntity": [
         {
           "@type": "Question",
-          "name": "Is using a Claude proxy allowed?",
+          "name": "Is TokenProvider affiliated with Anthropic?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Yes — the Anthropic API is a paid commercial service. Pooled resellers operate within Anthropic's commercial terms by holding the upstream accounts and reselling capacity."
+            "text": "No. TokenProvider is an independent third-party gateway and is not affiliated with, endorsed by, or sponsored by Anthropic. It does not replace an enterprise agreement, BAA, or SLA — use the official API when you need those."
           }
         },
         {
           "@type": "Question",
-          "name": "Why is the proxy cheaper?",
+          "name": "Why use a gateway instead of the direct API?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Volume discounts, smoothing of unused subscription capacity across many users, and operating margin stacked under official retail price."
+            "text": "One OpenAI-compatible endpoint covers Claude, Claude Code, ChatGPT, and Gemini with pay-as-you-go, per-request billing and a usage log, instead of a separate account, key, and invoice per vendor."
           }
         },
         {
           "@type": "Question",
-          "name": "Will my prompts be logged?",
+          "name": "How is my data handled?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "TokenProvider only stores billing metadata (token counts, model, timestamp). Prompt and response bodies are not retained server-side. Use a self-hosted proxy if you need stricter guarantees."
+            "text": "The gateway records billing metadata such as token counts, model, and timestamp to meter usage. See the Trust and billing page for current data-handling details, and self-host a proxy if you need stricter guarantees."
           }
         },
         {
           "@type": "Question",
-          "name": "What if the proxy goes down?",
+          "name": "What if the gateway goes down?",
           "acceptedAnswer": {
             "@type": "Answer",
             "text": "Claude Code and SDKs read ANTHROPIC_BASE_URL at startup. Unset it and you're back on api.anthropic.com immediately. Keep an official key as a fallback."
@@ -156,15 +156,15 @@
         <article>
           <h1>TokenProvider vs Official Claude API (2026)</h1>
           <p class="seo-lede">
-            TokenProvider is a pay-as-you-go Claude API proxy: same protocol as
-            <code>api.anthropic.com</code>, lower per-token cost, one key for Claude / Claude Code
+            TokenProvider is a pay-as-you-go Claude API gateway: same protocol as
+            <code>api.anthropic.com</code>, metered per-request billing, one key for Claude / Claude Code
             / ChatGPT / Gemini. Below is the honest side-by-side — including where the official
             API is still the better choice.
           </p>
 
           <div class="seo-tldr">
-            <p><strong>TL;DR:</strong> TokenProvider wins on price (~30–60% cheaper), unified billing,
-            and multi-vendor key reuse. The official API wins on direct enterprise contracts, SLA
+            <p><strong>TL;DR:</strong> TokenProvider wins on unified multi-vendor access, pay-as-you-go
+            billing, and one-key IDE drop-in. The official API wins on direct enterprise contracts, SLA
             guarantees, and HIPAA / SOC 2 audited workflows.</p>
           </div>
 
@@ -175,8 +175,8 @@
                 <tr><th>Dimension</th><th>TokenProvider</th><th>api.anthropic.com</th></tr>
               </thead>
               <tbody>
-                <tr><td>Sonnet 4 input price</td><td>~$1.50 per 1M tokens</td><td>$3 per 1M tokens</td></tr>
-                <tr><td>Sonnet 4 output price</td><td>~$7.50 per 1M tokens</td><td>$15 per 1M tokens</td></tr>
+                <tr><td>Sonnet 4 input price</td><td>Pay-as-you-go (live rate after sign-up)</td><td>$3 per 1M tokens</td></tr>
+                <tr><td>Sonnet 4 output price</td><td>Pay-as-you-go (live rate after sign-up)</td><td>$15 per 1M tokens</td></tr>
                 <tr><td>Opus access</td><td>Yes, same key</td><td>Yes, same key</td></tr>
                 <tr><td>ChatGPT / Gemini in same key</td><td>Yes</td><td>No (Anthropic only)</td></tr>
                 <tr><td>Minimum top-up</td><td>$1</td><td>$5 (varies by region)</td></tr>
@@ -190,10 +190,10 @@
 
           <h2>Where TokenProvider wins</h2>
 
-          <h3>1. Price</h3>
-          <p>Most users see <strong>30–60% off official pay-as-you-go rates</strong>. The discount
-          comes from pooling unused subscription capacity and high-volume bulk pricing on the
-          upstream side. You see the full per-request cost in the dashboard.</p>
+          <h3>1. Pay-as-you-go pricing</h3>
+          <p>You're billed per token actually used, with the full per-request cost visible in the
+          dashboard — no flat monthly commitment. For metered, bursty workloads that often comes out
+          below a fixed plan.</p>
 
           <h3>2. One key, four vendors</h3>
           <p>One <code>API_KEY</code> works for Claude, Claude Code, ChatGPT (incl. o4),
@@ -232,10 +232,10 @@
           <code>https://tokenprovider.store/v1/messages</code>. The proxy:</p>
           <ol>
             <li>Validates your key and current balance</li>
-            <li>Picks an upstream account from the pool, preferring the one that last served your key (sticky sessions = better cache hit)</li>
+            <li>Routes to available upstream capacity, preferring the route that last served your key (sticky sessions = better cache hits)</li>
             <li>Forwards the request unchanged to <code>api.anthropic.com</code></li>
             <li>Streams the response back, counting input/output tokens</li>
-            <li>Debits your balance at the discounted rate, logs the request</li>
+            <li>Debits your balance at your pay-as-you-go rate, logs the request</li>
           </ol>
           <p>For deeper architecture: <a href="/en/glossary/what-is-claude-relay.html">What Is a Claude API Proxy?</a></p>
 
@@ -259,15 +259,15 @@ curl https://tokenprovider.store/v1/messages \
 
           <h2>How to decide</h2>
           <ul>
-            <li><strong>Solo developer or small team, no compliance need:</strong> TokenProvider — save 30–60%.</li>
+            <li><strong>Solo developer or small team, no compliance need:</strong> TokenProvider — pay-as-you-go, one key for every model.</li>
             <li><strong>Production app handling regulated data:</strong> api.anthropic.com Enterprise.</li>
             <li><strong>Mixed: prototype + production:</strong> proxy for prototyping, direct API for prod traffic.</li>
             <li><strong>Heavy multi-vendor (Claude + ChatGPT + Gemini):</strong> TokenProvider — one key beats juggling three.</li>
           </ul>
 
           <section class="seo-cta-block">
-            <h2 class="seo-mt-0">Get a key. Cut your Claude bill in half.</h2>
-            <p>$1 top-up. Same SDK code. Cancel anytime. Side-by-side your real bill in 7 days.</p>
+            <h2 class="seo-mt-0">One key for Claude, GPT &amp; Gemini — pay per token.</h2>
+            <p>$1 top-up. Same SDK code. Cancel anytime.</p>
             <a class="seo-btn-cta" href="/register">Sign up free →</a>
             <a class="seo-btn-ghost" href="/login">Already a member</a>
           </section>
@@ -275,19 +275,19 @@ curl https://tokenprovider.store/v1/messages \
           <h2>FAQ</h2>
           <div class="seo-faq">
             <div class="seo-faq-item">
-              <h3>Is using a Claude proxy allowed?</h3>
-              <p>Yes — the Anthropic API is a paid commercial service. Pooled resellers operate within Anthropic's commercial terms by holding the upstream accounts and reselling capacity.</p>
+              <h3>Is TokenProvider affiliated with Anthropic?</h3>
+              <p>No. TokenProvider is an independent third-party gateway and is not affiliated with, endorsed by, or sponsored by Anthropic. It does not replace an enterprise agreement, BAA, or SLA — use the official API when you need those.</p>
             </div>
             <div class="seo-faq-item">
-              <h3>Why is the proxy cheaper?</h3>
-              <p>Volume discounts, smoothing of unused subscription capacity across many users, and operating margin stacked under official retail price.</p>
+              <h3>Why use a gateway instead of the direct API?</h3>
+              <p>One OpenAI-compatible endpoint covers Claude, Claude Code, ChatGPT, and Gemini with pay-as-you-go, per-request billing and a usage log — instead of a separate account, key, and invoice per vendor.</p>
             </div>
             <div class="seo-faq-item">
-              <h3>Will my prompts be logged?</h3>
-              <p>TokenProvider only stores billing metadata (token counts, model, timestamp). Prompt and response bodies are not retained server-side. For stricter guarantees consider self-hosting.</p>
+              <h3>How is my data handled?</h3>
+              <p>The gateway records billing metadata (token counts, model, timestamp) to meter usage. See <a href="/trust.html">Trust &amp; billing</a> for current data-handling details, and self-host a proxy if you need stricter guarantees.</p>
             </div>
             <div class="seo-faq-item">
-              <h3>What if the proxy goes down?</h3>
+              <h3>What if the gateway goes down?</h3>
               <p>Claude Code and SDKs read <code>ANTHROPIC_BASE_URL</code> at startup. Unset it and you're back on <code>api.anthropic.com</code>. Keep an official key as a fallback.</p>
             </div>
           </div>
@@ -312,7 +312,7 @@ curl https://tokenprovider.store/v1/messages \
           <a href="/login">Log in</a> ·
           <a href="/register">Sign up</a>
         </p>
-        <p>© TokenProvider · Claude / Claude Code / ChatGPT API gateway</p>
+        <p>© TokenProvider · Independent third-party Claude / Claude Code / ChatGPT / Gemini gateway · Not affiliated with Anthropic, OpenAI, or Google</p>
       </div>
     </footer>
   </body>

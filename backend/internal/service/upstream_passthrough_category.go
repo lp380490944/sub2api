@@ -25,6 +25,13 @@ func DeriveUpstreamCategory(a *Account) UpstreamCategory {
 		return override
 	}
 
+	// Rule 0.5: Bedrock Mantle is a native Anthropic-protocol endpoint reached via
+	// the API-key passthrough. Treat it as relay so beta flags and client headers
+	// are forwarded unmangled (model rewrite is applied explicitly at the branch).
+	if a.IsBedrockMantle() {
+		return CategoryRelay
+	}
+
 	// Rule 1: Upstream type → relay
 	if a.Type == AccountTypeUpstream {
 		return CategoryRelay

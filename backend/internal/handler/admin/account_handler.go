@@ -539,6 +539,10 @@ func (h *AccountHandler) Create(c *gin.Context) {
 	// base_rpm 输入校验：负值归零，超过 10000 截断
 	sanitizeExtraBaseRPM(req.Extra)
 	sanitizeExtraUpstreamPassthrough(req.Extra)
+	if err := normalizeBedrockMantleCredentials(req.Credentials); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
 
 	// P1-1: Capture registration fingerprint from browser User-Agent for OAuth accounts.
 	// This lets us serve per-account OS/arch hints to non-CC clients later, matching
@@ -638,6 +642,12 @@ func (h *AccountHandler) Update(c *gin.Context) {
 	// base_rpm 输入校验：负值归零，超过 10000 截断
 	sanitizeExtraBaseRPM(req.Extra)
 	sanitizeExtraUpstreamPassthrough(req.Extra)
+	if len(req.Credentials) > 0 {
+		if err := normalizeBedrockMantleCredentials(req.Credentials); err != nil {
+			response.BadRequest(c, err.Error())
+			return
+		}
+	}
 
 	// [tlsfp_debug] 诊断：观察前端实际提交的 enable_tls_fingerprint / cache_ttl_override_enabled
 	if req.Extra != nil {
@@ -923,6 +933,7 @@ func (h *AccountHandler) refreshSingleAccount(ctx context.Context, account *serv
 				newCredentials[k] = v
 			}
 		}
+		newCredentials = service.NormalizeOpenAIPersonalAccessTokenCredentials(account, tokenInfo, newCredentials)
 	} else if account.Platform == service.PlatformGemini {
 		tokenInfo, err := h.geminiOAuthService.RefreshAccountToken(ctx, account)
 		if err != nil {
@@ -2570,4 +2581,23 @@ func sanitizeExtraUpstreamPassthrough(extra map[string]any) {
 		return
 	}
 	extra["upstream_passthrough"] = clean
+}
+
+// normalizeBedrockMantleCredentials validates and normalizes credentials for a
+// Bedrock Mantle account (auth_mode == "bedrock_mantle"). It requires an api_key
+// and defaults the region to eu-north-1. No-op for other auth modes.
+func normalizeBedrockMantleCredentials(creds map[string]any) error {
+	if creds == nil {
+		return nil
+	}
+	if am, _ := creds["auth_mode"].(string); am != "bedrock_mantle" {
+		return nil
+	}
+	if apiKey, _ := creds["api_key"].(string); strings.TrimSpace(apiKey) == "" {
+		return errors.New("bedrock_mantle requires credentials.api_key")
+	}
+	if region, _ := creds["aws_region"].(string); strings.TrimSpace(region) == "" {
+		creds["aws_region"] = "eu-north-1"
+	}
+	return nil
 }

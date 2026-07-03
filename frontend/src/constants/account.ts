@@ -91,3 +91,140 @@ export const VERTEX_LOCATION_OPTIONS = [
     ]
   }
 ] as const
+
+/** One selectable AWS region for Bedrock. */
+export interface AwsBedrockRegion {
+  code: string
+  city: string
+}
+
+/** A geography-grouped block of Bedrock regions. `commercial:false` = not selected by default (GovCloud). */
+export interface AwsBedrockRegionGroup {
+  label: string
+  commercial: boolean
+  options: AwsBedrockRegion[]
+}
+
+/**
+ * Canonical AWS region list for Bedrock accounts. Single source of truth shared by the
+ * single-create region <select> and the batch-import board. Mirrors the AWS console region
+ * picker (commercial regions); GovCloud kept but flagged non-commercial (not default-selected).
+ */
+export const AWS_BEDROCK_REGIONS: AwsBedrockRegionGroup[] = [
+  {
+    label: 'US',
+    commercial: true,
+    options: [
+      { code: 'us-east-1', city: 'N. Virginia' },
+      { code: 'us-east-2', city: 'Ohio' },
+      { code: 'us-west-1', city: 'N. California' },
+      { code: 'us-west-2', city: 'Oregon' },
+    ],
+  },
+  {
+    label: 'Africa',
+    commercial: true,
+    options: [{ code: 'af-south-1', city: 'Cape Town' }],
+  },
+  {
+    label: 'Asia Pacific',
+    commercial: true,
+    options: [
+      { code: 'ap-east-1', city: 'Hong Kong' },
+      { code: 'ap-east-2', city: 'Taipei' },
+      { code: 'ap-south-1', city: 'Mumbai' },
+      { code: 'ap-south-2', city: 'Hyderabad' },
+      { code: 'ap-southeast-1', city: 'Singapore' },
+      { code: 'ap-southeast-2', city: 'Sydney' },
+      { code: 'ap-southeast-3', city: 'Jakarta' },
+      { code: 'ap-southeast-4', city: 'Melbourne' },
+      { code: 'ap-southeast-5', city: 'Malaysia' },
+      { code: 'ap-southeast-6', city: 'New Zealand' },
+      { code: 'ap-southeast-7', city: 'Thailand' },
+      { code: 'ap-northeast-1', city: 'Tokyo' },
+      { code: 'ap-northeast-2', city: 'Seoul' },
+      { code: 'ap-northeast-3', city: 'Osaka' },
+    ],
+  },
+  {
+    label: 'Canada',
+    commercial: true,
+    options: [
+      { code: 'ca-central-1', city: 'Central' },
+      { code: 'ca-west-1', city: 'Calgary' },
+    ],
+  },
+  {
+    label: 'Europe',
+    commercial: true,
+    options: [
+      { code: 'eu-central-1', city: 'Frankfurt' },
+      { code: 'eu-central-2', city: 'Zurich' },
+      { code: 'eu-west-1', city: 'Ireland' },
+      { code: 'eu-west-2', city: 'London' },
+      { code: 'eu-west-3', city: 'Paris' },
+      { code: 'eu-south-1', city: 'Milan' },
+      { code: 'eu-south-2', city: 'Spain' },
+      { code: 'eu-north-1', city: 'Stockholm' },
+    ],
+  },
+  {
+    label: 'Mexico',
+    commercial: true,
+    options: [{ code: 'mx-central-1', city: 'Central' }],
+  },
+  {
+    label: 'Middle East',
+    commercial: true,
+    options: [
+      { code: 'me-south-1', city: 'Bahrain' },
+      { code: 'me-central-1', city: 'UAE' },
+    ],
+  },
+  {
+    label: 'Israel',
+    commercial: true,
+    options: [{ code: 'il-central-1', city: 'Tel Aviv' }],
+  },
+  {
+    label: 'South America',
+    commercial: true,
+    options: [{ code: 'sa-east-1', city: 'São Paulo' }],
+  },
+  {
+    label: 'GovCloud',
+    commercial: false,
+    options: [
+      { code: 'us-gov-east-1', city: 'GovCloud US-East' },
+      { code: 'us-gov-west-1', city: 'GovCloud US-West' },
+    ],
+  },
+]
+
+/** Flat list of commercial region codes (default selection for the batch board). */
+export function commercialBedrockRegionCodes(): string[] {
+  return AWS_BEDROCK_REGIONS.filter((g) => g.commercial).flatMap((g) => g.options.map((o) => o.code))
+}
+
+/**
+ * Geographic cross-region inference family for a region, per Anthropic's current-model
+ * Bedrock region table (US / EU / JP / AU + GovCloud). Returns '' when the region has NO
+ * geographic profile — those regions are reachable only via the global. profile, so a
+ * "Geo" account there is invalid (e.g. sa-east-1 + us. → 400 invalid model identifier).
+ * Mirrors backend BedrockCrossRegionPrefix (bedrock_request.go), except the backend
+ * returns 'global' for the no-geo case while the UI uses '' to mean "no geo, global only".
+ * Note: there is no apac. profile for current Claude models (Claude-3 era only).
+ */
+export function awsBedrockGeoFamily(region: string): string {
+  if (region.startsWith('us-gov')) return 'us-gov'
+  if (region === 'ca-central-1' || region.startsWith('us-')) return 'us'
+  if (region.startsWith('eu-')) return 'eu'
+  if (region === 'ap-northeast-1' || region === 'ap-northeast-3') return 'jp'
+  if (region === 'ap-southeast-2' || region === 'ap-southeast-4') return 'au'
+  return '' // no geographic profile → global-only
+}
+
+/** Whether a region has a geographic cross-region inference profile (can get a "Geo" account). */
+export function awsBedrockRegionHasGeo(region: string): boolean {
+  return awsBedrockGeoFamily(region) !== ''
+}

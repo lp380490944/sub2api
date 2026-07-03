@@ -210,8 +210,20 @@ func (s *AccountTestService) testClaudeAccountConnection(c *gin.Context, account
 		testModelID = account.GetMappedModel(testModelID)
 	}
 
-	// Bedrock accounts use a separate test path
-	if account.IsBedrock() {
+	// Bedrock Mantle is a native Anthropic-protocol endpoint (plain API key),
+	// NOT SigV4/InvokeModel. Resolve its global.* model and let it flow through
+	// the native /v1/messages test path below (the auth block sets its URL).
+	if account.IsBedrockMantle() {
+		if mappedModel, ok := ResolveBedrockMantleModelID(account, testModelID); ok {
+			testModelID = mappedModel
+		}
+	} else if account.IsClaudePlatformAWS() {
+		// Claude Platform on AWS (aws-external-anthropic) is native Anthropic
+		// protocol with a plain API key, not SigV4 — handled by the native path
+		// below. Apply account model mapping like the gateway forward path.
+		testModelID = account.GetMappedModel(testModelID)
+	} else if account.IsBedrock() {
+		// SigV4 / Bedrock API Key accounts use the InvokeModel test path.
 		return s.testBedrockAccountConnection(c, ctx, account, testModelID)
 	}
 	if account.Type == AccountTypeServiceAccount {
@@ -248,6 +260,22 @@ func (s *AccountTestService) testClaudeAccountConnection(c *gin.Context, account
 			return s.sendErrorAndEnd(c, fmt.Sprintf("Invalid base URL: %s", err.Error()))
 		}
 		apiURL = strings.TrimSuffix(normalizedBaseURL, "/") + "/v1/messages"
+	} else if account.IsBedrockMantle() {
+		// Bedrock Mantle: native Anthropic protocol at the Mantle endpoint, plain API key.
+		useBearer = false
+		authToken = account.GetCredential("api_key")
+		if authToken == "" {
+			return s.sendErrorAndEnd(c, "No API key available")
+		}
+		apiURL = BuildBedrockMantleMessagesURL(bedrockMantleRegion(account))
+	} else if account.IsClaudePlatformAWS() {
+		// Claude Platform on AWS: native Anthropic protocol, plain API key + workspace id.
+		useBearer = false
+		authToken = account.GetCredential("api_key")
+		if authToken == "" {
+			return s.sendErrorAndEnd(c, "No API key available")
+		}
+		apiURL = BuildClaudePlatformAWSMessagesURL(claudePlatformAWSRegion(account))
 	} else {
 		return s.sendErrorAndEnd(c, fmt.Sprintf("Unsupported account type: %s", account.Type))
 	}
@@ -290,6 +318,13 @@ func (s *AccountTestService) testClaudeAccountConnection(c *gin.Context, account
 	} else {
 		req.Header.Set("anthropic-beta", claude.APIKeyBetaHeader)
 		req.Header.Set("x-api-key", authToken)
+	}
+
+	// Claude Platform on AWS requires the workspace id header on every request.
+	if account.IsClaudePlatformAWS() {
+		if ws := claudePlatformAWSWorkspaceID(account); ws != "" {
+			req.Header.Set("anthropic-workspace-id", ws)
+		}
 	}
 
 	// Force context-1m beta when the account is configured to require it,
@@ -535,7 +570,6 @@ func (s *AccountTestService) testOpenAIAccountConnection(c *gin.Context, account
 	var authToken string
 	var apiURL string
 	var isOAuth bool
-	var chatgptAccountID string
 
 	if account.IsOAuth() {
 		isOAuth = true
@@ -547,7 +581,6 @@ func (s *AccountTestService) testOpenAIAccountConnection(c *gin.Context, account
 
 		// OAuth uses ChatGPT internal API
 		apiURL = chatgptCodexAPIURL
-		chatgptAccountID = account.GetChatGPTAccountID()
 	} else if account.Type == "apikey" {
 		// API Key - use Platform API
 		authToken = account.GetOpenAIApiKey()
@@ -599,9 +632,7 @@ func (s *AccountTestService) testOpenAIAccountConnection(c *gin.Context, account
 	if isOAuth {
 		req.Host = "chatgpt.com"
 		req.Header.Set("accept", "text/event-stream")
-		if chatgptAccountID != "" {
-			req.Header.Set("chatgpt-account-id", chatgptAccountID)
-		}
+		setOpenAIChatGPTAccountHeaders(req.Header, account)
 	}
 
 	// Get proxy URL
@@ -708,7 +739,6 @@ func (s *AccountTestService) testOpenAICompactConnection(c *gin.Context, account
 	authToken := ""
 	apiURL := ""
 	isOAuth := false
-	chatgptAccountID := ""
 
 	switch {
 	case account.IsOAuth():
@@ -718,7 +748,6 @@ func (s *AccountTestService) testOpenAICompactConnection(c *gin.Context, account
 			return s.sendErrorAndEnd(c, "No access token available")
 		}
 		apiURL = chatgptCodexAPIURL + "/compact"
-		chatgptAccountID = account.GetChatGPTAccountID()
 	case account.Type == AccountTypeAPIKey:
 		authToken = account.GetOpenAIApiKey()
 		if authToken == "" {
@@ -765,9 +794,7 @@ func (s *AccountTestService) testOpenAICompactConnection(c *gin.Context, account
 
 	if isOAuth {
 		req.Host = "chatgpt.com"
-		if chatgptAccountID != "" {
-			req.Header.Set("chatgpt-account-id", chatgptAccountID)
-		}
+		setOpenAIChatGPTAccountHeaders(req.Header, account)
 	}
 
 	proxyURL := ""
@@ -1618,9 +1645,7 @@ func (s *AccountTestService) testOpenAIImageOAuth(c *gin.Context, ctx context.Co
 	} else {
 		req.Header.Set("User-Agent", codexCLIUserAgent)
 	}
-	if chatgptAccountID := strings.TrimSpace(account.GetChatGPTAccountID()); chatgptAccountID != "" {
-		req.Header.Set("chatgpt-account-id", chatgptAccountID)
-	}
+	setOpenAIChatGPTAccountHeaders(req.Header, account)
 
 	proxyURL := ""
 	if account.ProxyID != nil && account.Proxy != nil {

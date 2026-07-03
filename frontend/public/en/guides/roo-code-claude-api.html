@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/png" href="/logo.png" />
+
+    <title>Roo Code Custom LLM Setup: Claude, GPT &amp; Gemini via One Endpoint (2026) | TokenProvider</title>
+    <meta name="description" content="Connect Roo Code in VS Code to a custom Claude / GPT / Gemini endpoint. Use the OpenAI-Compatible or Anthropic provider, set one base URL and key, and assign per-mode models. Pay-as-you-go, step-by-step." />
+    <meta name="keywords" content="roo code claude api, roo code custom llm endpoint, roo code openai compatible, roo code anthropic base url, roo code proxy, roo code custom model" />
+    <meta name="robots" content="index,follow" />
+    <meta name="theme-color" content="#14b8a6" />
+
+    <link rel="canonical" href="https://tokenprovider.store/en/guides/roo-code-claude-api.html" />
+    <link rel="alternate" hreflang="en" href="https://tokenprovider.store/en/guides/roo-code-claude-api.html" />
+    <link rel="alternate" hreflang="x-default" href="https://tokenprovider.store/en/guides/roo-code-claude-api.html" />
+
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content="https://tokenprovider.store/en/guides/roo-code-claude-api.html" />
+    <meta property="og:title" content="Roo Code Custom LLM Setup (2026)" />
+    <meta property="og:description" content="One OpenAI-compatible base URL + key = Claude, GPT &amp; Gemini inside Roo Code. Per-mode models, pay-as-you-go." />
+    <meta property="og:image" content="https://tokenprovider.store/logo.png" />
+    <meta property="og:site_name" content="TokenProvider" />
+    <meta property="og:locale" content="en_US" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Roo Code Custom LLM Setup (2026)" />
+    <meta name="twitter:description" content="One OpenAI-compatible base URL + key = Claude, GPT &amp; Gemini inside Roo Code." />
+    <meta name="twitter:image" content="https://tokenprovider.store/logo.png" />
+
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "HowTo",
+      "name": "Configure Roo Code with a Custom Claude / GPT / Gemini Endpoint",
+      "description": "Use Roo Code's OpenAI-Compatible provider to route requests through a single pay-as-you-go gateway.",
+      "inLanguage": "en",
+      "totalTime": "PT3M",
+      "supply": [
+        {
+          "@type": "HowToSupply",
+          "name": "Roo Code (VS Code extension)"
+        },
+        {
+          "@type": "HowToSupply",
+          "name": "TokenProvider account + API key"
+        }
+      ],
+      "step": [
+        {
+          "@type": "HowToStep",
+          "name": "Open Roo Code settings",
+          "text": "Click the Roo Code icon in the Activity Bar, then the gear icon to open API Configuration"
+        },
+        {
+          "@type": "HowToStep",
+          "name": "Choose the OpenAI Compatible provider",
+          "text": "In the API Provider dropdown, select OpenAI Compatible"
+        },
+        {
+          "@type": "HowToStep",
+          "name": "Set base URL and key",
+          "text": "Base URL https://tokenprovider.store/v1 and paste your TokenProvider key"
+        },
+        {
+          "@type": "HowToStep",
+          "name": "Set the model and verify",
+          "text": "Enter a model ID such as claude-sonnet-4-20250514, save, and run a prompt to confirm"
+        }
+      ]
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "TokenProvider",
+          "item": "https://tokenprovider.store/en.html"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Roo Code custom LLM setup",
+          "item": "https://tokenprovider.store/en/guides/roo-code-claude-api.html"
+        }
+      ]
+    }
+    </script>
+
+    <link rel="stylesheet" href="/assets/seo.css" />
+  </head>
+  <body>
+    <div class="seo-bg-decor"></div>
+
+    <header class="seo-header">
+      <div class="seo-container-wide">
+        <nav class="seo-nav">
+          <a class="seo-logo" href="/en.html">
+            <img src="/logo.png" alt="TokenProvider logo" width="36" height="36" />
+            <span class="seo-logo-text">TokenProvider</span>
+          </a>
+          <div class="seo-nav-links">
+            <a class="seo-nav-link" href="/en.html">Home</a>
+            <a class="seo-nav-link" href="/login">Log in</a>
+            <a class="seo-btn-primary" href="/register">Sign up →</a>
+          </div>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <div class="seo-container">
+        <article>
+          <h1>Roo Code Custom LLM Setup</h1>
+          <p class="seo-lede">
+            Roo Code is an autonomous coding agent for VS Code, and it lets you bring any
+            OpenAI-compatible or Anthropic endpoint. Point it at a single gateway and you get
+            <strong>Claude, Claude Code, ChatGPT, and Gemini behind one base URL and one key</strong> —
+            with pay-as-you-go, per-request billing instead of four separate plans. Setup time: 3 minutes.
+          </p>
+
+          <div class="seo-tldr">
+            <p><strong>The fast path:</strong> Roo Code → settings (gear) → API Provider =
+            <strong>OpenAI Compatible</strong> → Base URL <code>https://tokenprovider.store/v1</code>,
+            paste your key, set a model ID like <code>claude-sonnet-4-20250514</code>. Done.</p>
+          </div>
+
+          <h2>Two ways to connect Roo Code</h2>
+          <p>Roo Code exposes several API providers. Two are relevant here:</p>
+          <ol>
+            <li><strong>OpenAI Compatible</strong> — one endpoint for every model. The gateway
+              maps the model ID you enter to the right vendor, so Claude, GPT, and Gemini all work
+              from a single configuration.</li>
+            <li><strong>Anthropic</strong> — native Anthropic protocol with a custom base URL.
+              Cleaner for Claude-only workflows, but limited to Claude models.</li>
+          </ol>
+          <p>Most people want Option A — it covers every model and every Roo Code mode from one slot.</p>
+
+          <h2>Option A: OpenAI Compatible provider (recommended)</h2>
+          <ol class="seo-steps">
+            <li>
+              <h3>Open Roo Code settings</h3>
+              <p>Click the Roo Code icon in the VS Code Activity Bar, then the <strong>gear</strong>
+              icon → <strong>API Configuration</strong>.</p>
+            </li>
+
+            <li>
+              <h3>Set API Provider to "OpenAI Compatible"</h3>
+              <p>In the <strong>API Provider</strong> dropdown, choose <strong>OpenAI Compatible</strong>.</p>
+            </li>
+
+            <li>
+              <h3>Enter the base URL and key</h3>
+              <p>Base URL: <code>https://tokenprovider.store/v1</code><br>
+              API Key: paste the key from your <a href="/keys">Keys page</a>.</p>
+              <div class="seo-warn">
+                <p>Keep the <code>/v1</code> suffix for the OpenAI-Compatible provider. The native
+                Anthropic provider (Option B) and Claude Code use the base URL <em>without</em> /v1.</p>
+              </div>
+            </li>
+
+            <li>
+              <h3>Set a model ID</h3>
+              <p>Type a full model ID in the <strong>Model</strong> field, e.g.:</p>
+              <ul>
+                <li><code>claude-sonnet-4-20250514</code> — day-to-day coding</li>
+                <li><code>claude-opus-4-20250514</code> — hard refactors / planning</li>
+                <li><code>gpt-4o</code> — quick questions</li>
+              </ul>
+              <p>Roo Code passes the model ID straight through; the gateway routes it to the right vendor.</p>
+            </li>
+
+            <li>
+              <h3>Save and verify</h3>
+              <p>Save the config, open the Roo Code chat, and run a small task like
+              "explain this file." A normal response means it is routing correctly — and the call
+              appears on your <a href="/usage">Usage page</a> with tokens billed and a request ID.</p>
+            </li>
+          </ol>
+
+          <h2>Option B: Anthropic provider with custom base URL</h2>
+          <p>If you only use Claude and prefer the native protocol:</p>
+          <ol>
+            <li>API Provider → <strong>Anthropic</strong>.</li>
+            <li>Paste your key, tick <strong>Use custom base URL</strong>, and enter
+              <code>https://tokenprovider.store</code> (no <code>/v1</code>).</li>
+            <li>Select a Claude model. Roo Code now sends native <code>messages</code> requests.</li>
+          </ol>
+
+          <h2>Assign cheaper models per mode</h2>
+          <p>Roo Code's biggest cost lever is its <strong>modes</strong>. You don't need Opus for
+          everything — assign a model per mode and your bill drops without losing quality where it
+          matters:</p>
+          <div class="seo-table-wrap">
+            <table class="seo-table">
+              <thead><tr><th>Mode</th><th>Job</th><th>Sensible model</th></tr></thead>
+              <tbody>
+                <tr><td>Code</td><td>Writing &amp; editing files</td><td>Sonnet — strong default</td></tr>
+                <tr><td>Architect</td><td>Planning multi-file changes</td><td>Opus for big plans, Sonnet otherwise</td></tr>
+                <tr><td>Ask</td><td>Quick Q&amp;A, no edits</td><td>GPT-4o / Haiku — cheap &amp; fast</td></tr>
+                <tr><td>Debug</td><td>Tracing failures</td><td>Sonnet</td></tr>
+                <tr><td>Orchestrator</td><td>Delegating subtasks</td><td>Sonnet, with cheaper models on the children</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>Create one API config profile per model in Roo Code, then bind a profile to each mode.</p>
+
+          <h2>Common errors</h2>
+          <div class="seo-table-wrap">
+            <table class="seo-table">
+              <thead><tr><th>Error</th><th>Cause</th><th>Fix</th></tr></thead>
+              <tbody>
+                <tr><td>Connection / 404</td><td>Missing <code>/v1</code> on the OpenAI-Compatible provider</td><td>Use exactly <code>https://tokenprovider.store/v1</code></td></tr>
+                <tr><td>"Model not found"</td><td>Model ID typo</td><td>Use a full versioned ID like <code>claude-sonnet-4-20250514</code></td></tr>
+                <tr><td>401</td><td>Wrong or revoked key</td><td>Regenerate on the <a href="/keys">Keys page</a></td></tr>
+                <tr><td>429</td><td>Burst over the current rate limit</td><td>Retry; smart routing spreads load and reduces 429s vs a single key</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h2>FAQ</h2>
+          <div class="seo-faq">
+            <div class="seo-faq-item">
+              <h3>Is Roo Code the same as Cline?</h3>
+              <p>They share lineage but are separate extensions with different mode systems. Both
+              accept a custom OpenAI-compatible or Anthropic endpoint, so the same gateway works for
+              either — see the <a href="/en/guides/cline-cheap-claude.html">Cline guide</a> for that setup.</p>
+            </div>
+            <div class="seo-faq-item">
+              <h3>Can I use Claude and GPT in the same project?</h3>
+              <p>Yes. With the OpenAI-Compatible provider you just change the model ID — one key,
+              one base URL, every model.</p>
+            </div>
+            <div class="seo-faq-item">
+              <h3>How do I keep costs down on agent runs?</h3>
+              <p>Assign cheaper models to Ask/Debug modes, keep Opus for Architect, and watch
+              per-request spend on the <a href="/usage">Usage page</a>. Agent loops make many calls,
+              so per-mode model choice matters more than in a normal chat.</p>
+            </div>
+            <div class="seo-faq-item">
+              <h3>Latency hit?</h3>
+              <p>+20–80 ms over a direct call. For agentic edits, model think-time dominates, so the
+              gateway hop is not what you'll feel.</p>
+            </div>
+          </div>
+
+          <section class="seo-cta-block">
+            <h2 class="seo-mt-0">One endpoint for every Roo Code mode</h2>
+            <p>$1 minimum top-up, pay per token, cancel anytime.</p>
+            <a class="seo-btn-cta" href="/register">Sign up free →</a>
+            <a class="seo-btn-ghost" href="/login">Already a member</a>
+          </section>
+
+          <section class="seo-related">
+            <h2>Related guides</h2>
+            <ul class="seo-related-list">
+              <li><a href="/en/guides/cursor-claude-proxy.html"><strong>Cursor + Claude API Proxy</strong><span>2-minute setup</span></a></li>
+              <li><a href="/en/guides/cline-cheap-claude.html"><strong>Cline + Custom Claude</strong><span>VS Code agent</span></a></li>
+              <li><a href="/en/guides/claude-code-setup.html"><strong>Claude Code Setup</strong><span>Anthropic CLI</span></a></li>
+              <li><a href="/en/compare/claude-vs-chatgpt-api.html"><strong>Claude vs ChatGPT API</strong><span>Pick the right model</span></a></li>
+            </ul>
+          </section>
+        </article>
+      </div>
+    </main>
+
+    <footer class="seo-footer">
+      <div class="seo-container">
+        <p>
+          <a href="/en.html">Home</a> ·
+          <a href="/login">Log in</a> ·
+          <a href="/register">Sign up</a>
+        </p>
+        <p>© TokenProvider · Independent third-party Claude / Claude Code / ChatGPT / Gemini gateway · Not affiliated with Anthropic, OpenAI, or Google</p>
+      </div>
+    </footer>
+  </body>
+</html>

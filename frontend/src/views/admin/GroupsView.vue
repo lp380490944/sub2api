@@ -489,6 +489,77 @@
           </select>
           <p class="input-hint">{{ t("admin.groups.copyAccounts.hint") }}</p>
         </div>
+        <!-- 直接选择账号 -->
+        <div>
+          <div class="mb-1.5 flex items-center gap-1">
+            <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
+              {{ t("admin.groups.accountIds.title") }}
+            </label>
+            <div class="group relative inline-flex">
+              <Icon
+                name="questionCircle"
+                size="sm"
+                :stroke-width="2"
+                class="cursor-help text-gray-400 transition-colors hover:text-primary-500 dark:text-gray-500 dark:hover:text-primary-400"
+              />
+              <div
+                class="tooltip-arrow invisible absolute bottom-full left-1/2 z-50 mb-2 w-64 -translate-x-1/2 rounded-lg bg-gray-900 px-3 py-2 text-xs text-white opacity-0 shadow-lg transition-all duration-200 group-hover:visible group-hover:opacity-100 dark:bg-gray-700"
+              >
+                {{ t("admin.groups.accountIds.tooltip") }}
+              </div>
+            </div>
+          </div>
+          <!-- 已选账号 chips -->
+          <div
+            v-if="createForm.account_ids.length > 0"
+            class="mb-2 flex flex-wrap gap-2"
+          >
+            <div
+              v-for="accountId in createForm.account_ids"
+              :key="accountId"
+              class="inline-flex items-center gap-1.5 rounded-full bg-primary-100 px-3 py-1 text-sm text-primary-800 dark:bg-primary-900 dark:text-primary-200"
+            >
+              <span>{{ getAccountNameById(accountId) }}</span>
+              <button
+                type="button"
+                @click="
+                  createForm.account_ids = createForm.account_ids.filter(
+                    (id) => id !== accountId,
+                  )
+                "
+                class="rounded-full hover:bg-primary-200 dark:hover:bg-primary-800"
+              >
+                <Icon name="x" size="xs" :stroke-width="2" />
+              </button>
+            </div>
+          </div>
+          <!-- 账号下拉选择 -->
+          <select
+            class="input"
+            @change="
+              (e) => {
+                const val = Number((e.target as HTMLSelectElement).value);
+                if (val && !createForm.account_ids.includes(val)) {
+                  createForm.account_ids.push(val);
+                }
+                (e.target as HTMLSelectElement).value = '';
+              }
+            "
+          >
+            <option value="">
+              {{ t("admin.groups.accountIds.selectPlaceholder") }}
+            </option>
+            <option
+              v-for="acc in availableAccountsForCreate"
+              :key="acc.id"
+              :value="acc.id"
+              :disabled="createForm.account_ids.includes(acc.id)"
+            >
+              {{ acc.name }}
+            </option>
+          </select>
+          <p class="input-hint">{{ t("admin.groups.accountIds.hint") }}</p>
+        </div>
         <div>
           <label class="input-label">{{
             t("admin.groups.form.rateMultiplier")
@@ -1844,6 +1915,77 @@
           <p class="input-hint">
             {{ t("admin.groups.copyAccounts.hintEdit") }}
           </p>
+        </div>
+        <!-- 直接选择账号 -->
+        <div>
+          <div class="mb-1.5 flex items-center gap-1">
+            <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
+              {{ t("admin.groups.accountIds.title") }}
+            </label>
+            <div class="group relative inline-flex">
+              <Icon
+                name="questionCircle"
+                size="sm"
+                :stroke-width="2"
+                class="cursor-help text-gray-400 transition-colors hover:text-primary-500 dark:text-gray-500 dark:hover:text-primary-400"
+              />
+              <div
+                class="tooltip-arrow invisible absolute bottom-full left-1/2 z-50 mb-2 w-64 -translate-x-1/2 rounded-lg bg-gray-900 px-3 py-2 text-xs text-white opacity-0 shadow-lg transition-all duration-200 group-hover:visible group-hover:opacity-100 dark:bg-gray-700"
+              >
+                {{ t("admin.groups.accountIds.tooltip") }}
+              </div>
+            </div>
+          </div>
+          <!-- 已选账号 chips -->
+          <div
+            v-if="editForm.account_ids.length > 0"
+            class="mb-2 flex flex-wrap gap-2"
+          >
+            <div
+              v-for="accountId in editForm.account_ids"
+              :key="accountId"
+              class="inline-flex items-center gap-1.5 rounded-full bg-primary-100 px-3 py-1 text-sm text-primary-800 dark:bg-primary-900 dark:text-primary-200"
+            >
+              <span>{{ getAccountNameById(accountId) }}</span>
+              <button
+                type="button"
+                @click="
+                  editForm.account_ids = editForm.account_ids.filter(
+                    (id) => id !== accountId,
+                  )
+                "
+                class="rounded-full hover:bg-primary-200 dark:hover:bg-primary-800"
+              >
+                <Icon name="x" size="xs" :stroke-width="2" />
+              </button>
+            </div>
+          </div>
+          <!-- 账号下拉选择 -->
+          <select
+            class="input"
+            @change="
+              (e) => {
+                const val = Number((e.target as HTMLSelectElement).value);
+                if (val && !editForm.account_ids.includes(val)) {
+                  editForm.account_ids.push(val);
+                }
+                (e.target as HTMLSelectElement).value = '';
+              }
+            "
+          >
+            <option value="">
+              {{ t("admin.groups.accountIds.selectPlaceholder") }}
+            </option>
+            <option
+              v-for="acc in availableAccountsForEdit"
+              :key="acc.id"
+              :value="acc.id"
+              :disabled="editForm.account_ids.includes(acc.id)"
+            >
+              {{ acc.name }}
+            </option>
+          </select>
+          <p class="input-hint">{{ t("admin.groups.accountIds.hint") }}</p>
         </div>
         <div>
           <label class="input-label">{{
@@ -3285,6 +3427,7 @@ const platformOptions = computed(() => [
   { value: "gemini", label: "Gemini" },
   { value: "antigravity", label: "Antigravity" },
   { value: "kiro", label: "Kiro" },
+  { value: "grok", label: "Grok" },
 ]);
 
 const platformFilterOptions = computed(() => [
@@ -3294,6 +3437,7 @@ const platformFilterOptions = computed(() => [
   { value: "gemini", label: "Gemini" },
   { value: "antigravity", label: "Antigravity" },
   { value: "kiro", label: "Kiro" },
+  { value: "grok", label: "Grok" },
 ]);
 
 const editStatusOptions = computed(() => [
@@ -3406,6 +3550,25 @@ const copyAccountsGroupOptionsForEdit = computed(() => {
   }));
 });
 
+// 可用账号列表（用于创建表单）
+const allAccountsForSelection = ref<Array<{ id: number; name: string; platform: string; status: string }>>([]);
+const availableAccountsForCreate = computed(() => {
+  return allAccountsForSelection.value.filter(
+    (acc) => acc.platform === createForm.platform && acc.status === 'active'
+  );
+});
+const availableAccountsForEdit = computed(() => {
+  return allAccountsForSelection.value.filter(
+    (acc) => acc.platform === editForm.platform && acc.status === 'active'
+  );
+});
+
+// 根据账号 ID 获取账号名称
+const getAccountNameById = (accountId: number): string => {
+  const account = allAccountsForSelection.value.find((acc) => acc.id === accountId);
+  return account ? account.name : `#${accountId}`;
+};
+
 const groups = ref<AdminGroup[]>([]);
 const loading = ref(false);
 const usageMap = ref<Map<number, { today_cost: number; total_cost: number }>>(
@@ -3509,6 +3672,8 @@ const createForm = reactive({
   mcp_xml_inject: true,
   // 从分组复制账号
   copy_accounts_from_group_ids: [] as number[],
+  // 直接选择归入该分组的账号 ID 列表
+  account_ids: [] as number[],
   // 分组级 RPM 限制（每用户每分钟最大请求数；0 = 不限制）
   rpm_limit: 0 as number,
   // ── M2：分组级策略默认值 ──
@@ -3848,6 +4013,8 @@ const editForm = reactive({
   mcp_xml_inject: true,
   // 从分组复制账号
   copy_accounts_from_group_ids: [] as number[],
+  // 直接选择归入该分组的账号 ID 列表
+  account_ids: [] as number[],
   // 分组级 RPM 限制（每用户每分钟最大请求数；0 = 不限制）
   rpm_limit: 0 as number,
   // ── M2：分组级策略默认值 ──
@@ -3972,6 +4139,24 @@ const loadGroups = async () => {
     if (abortController === currentController && !signal.aborted) {
       loading.value = false;
     }
+  }
+};
+
+// 加载所有账号列表（用于账号选择器）
+const loadAccounts = async () => {
+  try {
+    const response = await adminAPI.accounts.list(1, 1000, {
+      sort_by: 'name',
+      sort_order: 'asc',
+    });
+    allAccountsForSelection.value = response.items.map((acc: any) => ({
+      id: acc.id,
+      name: acc.name,
+      platform: acc.platform,
+      status: acc.status,
+    }));
+  } catch (error) {
+    console.error('Error loading accounts for selection:', error);
   }
 };
 
@@ -4258,6 +4443,7 @@ const handleEdit = async (group: AdminGroup) => {
   ];
   editForm.mcp_xml_inject = group.mcp_xml_inject ?? true;
   editForm.copy_accounts_from_group_ids = []; // 复制账号字段每次编辑时重置为空
+  editForm.account_ids = []; // 先重置
   editForm.rpm_limit = group.rpm_limit ?? 0;
   editForm.default_account_concurrency = group.default_account_concurrency ?? 0;
   editForm.default_account_rpm = group.default_account_rpm ?? 0;
@@ -4272,6 +4458,18 @@ const handleEdit = async (group: AdminGroup) => {
     group.model_routing,
   );
   loadModelsListCandidates("edit", group.id, group.platform);
+
+  // 加载当前分组的账号列表
+  try {
+    const response = await adminAPI.accounts.list(1, 1000, {
+      group: String(group.id),
+      status: 'active',
+    });
+    editForm.account_ids = response.items.map((acc: any) => acc.id);
+  } catch (error) {
+    console.error('Error loading group accounts:', error);
+  }
+
   showEditModal.value = true;
 };
 
@@ -4284,6 +4482,7 @@ const closeEditModal = () => {
   editingGroup.value = null;
   editModelRoutingRules.value = [];
   editForm.copy_accounts_from_group_ids = [];
+  editForm.account_ids = [];
   editForm.default_model_rate_limits = [];
   resetMessagesDispatchFormState(editForm);
   resetModelsListState(editModelsListState);
@@ -4535,6 +4734,7 @@ const saveSortOrder = async () => {
 
 onMounted(() => {
   loadGroups();
+  loadAccounts();
   loadModelsListCandidates("create", 0, createForm.platform);
   document.addEventListener("click", handleClickOutside);
 });

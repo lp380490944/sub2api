@@ -462,17 +462,28 @@ func TestBedrockCrossRegionPrefix(t *testing.T) {
 		{"eu-central-2", "eu"},
 		{"eu-north-1", "eu"},
 		{"eu-south-1", "eu"},
-		// APAC regions
-		{"ap-northeast-1", "jp"},
-		{"ap-northeast-2", "apac"},
-		{"ap-southeast-1", "apac"},
-		{"ap-southeast-2", "au"},
-		{"ap-south-1", "apac"},
-		// Canada / South America fallback to us
+		// US geo also covers Canada Central (per Anthropic region table)
 		{"ca-central-1", "us"},
-		{"sa-east-1", "us"},
-		// Unknown defaults to us
-		{"me-south-1", "us"},
+		// Japan geo: Tokyo + Osaka
+		{"ap-northeast-1", "jp"},
+		{"ap-northeast-3", "jp"},
+		// Australia geo: Sydney + Melbourne
+		{"ap-southeast-2", "au"},
+		{"ap-southeast-4", "au"},
+		// No geographic profile for current models -> global (was wrongly "apac"/"us")
+		{"ap-northeast-2", "global"}, // Seoul
+		{"ap-southeast-1", "global"}, // Singapore
+		{"ap-southeast-3", "global"}, // Jakarta
+		{"ap-south-1", "global"},     // Mumbai
+		{"ap-south-2", "global"},     // Hyderabad
+		{"ap-east-1", "global"},      // Hong Kong
+		{"ca-west-1", "global"},      // Calgary
+		{"sa-east-1", "global"},      // São Paulo
+		{"af-south-1", "global"},     // Cape Town
+		{"me-central-1", "global"},   // UAE
+		{"me-south-1", "global"},     // Bahrain
+		{"il-central-1", "global"},   // Tel Aviv
+		{"mx-central-1", "global"},   // Mexico
 	}
 	for _, tt := range tests {
 		t.Run(tt.region, func(t *testing.T) {
@@ -718,7 +729,8 @@ func TestAdjustBedrockModelRegionPrefix(t *testing.T) {
 		// APAC region — jp and au have dedicated prefixes per AWS docs
 		{"jp region (ap-northeast-1)", "us.anthropic.claude-sonnet-4-5-20250929-v1:0", "ap-northeast-1", "jp.anthropic.claude-sonnet-4-5-20250929-v1:0"},
 		{"au region (ap-southeast-2)", "us.anthropic.claude-haiku-4-5-20251001-v1:0", "ap-southeast-2", "au.anthropic.claude-haiku-4-5-20251001-v1:0"},
-		{"apac region (ap-southeast-1)", "us.anthropic.claude-sonnet-4-5-20250929-v1:0", "ap-southeast-1", "apac.anthropic.claude-sonnet-4-5-20250929-v1:0"},
+		// Singapore has no geographic profile for current models -> global (was apac)
+		{"global-only region (ap-southeast-1)", "us.anthropic.claude-sonnet-4-5-20250929-v1:0", "ap-southeast-1", "global.anthropic.claude-sonnet-4-5-20250929-v1:0"},
 		// eu → us (user manually set eu prefix, moved to us region)
 		{"eu to us", "eu.anthropic.claude-opus-4-6-v1", "us-west-2", "us.anthropic.claude-opus-4-6-v1"},
 		// global prefix — replace to match region
