@@ -70,14 +70,28 @@ describe('getVisibleMethods', () => {
     expect(visible.card.single_max).toBe(50000)
   })
 
-  it('drops unknown methods like cashapp and apple_pay', () => {
+  it('keeps unknown methods like cashapp and apple_pay as custom methods', () => {
+    // Since custom EasyPay methods landed, unlisted method keys pass through
+    // verbatim instead of being dropped — the backend controls which keys appear.
     const visible = getVisibleMethods({
       cashapp: methodLimit(),
       apple_pay: methodLimit(),
       card: methodLimit(),
     })
 
-    expect(Object.keys(visible)).toEqual(['card'])
+    expect(Object.keys(visible).sort()).toEqual(['apple_pay', 'card', 'cashapp'])
+  })
+
+  it('keeps custom EasyPay methods as visible methods', () => {
+    const visible = getVisibleMethods({
+      ldc: methodLimit({ single_min: 3 }),
+      usdt_trc20: methodLimit({ fee_rate: 1 }),
+    })
+
+    expect(visible).toEqual({
+      ldc: methodLimit({ single_min: 3 }),
+      usdt_trc20: methodLimit({ fee_rate: 1 }),
+    })
   })
 })
 
