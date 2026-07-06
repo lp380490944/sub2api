@@ -16,6 +16,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/payment"
 	"github.com/Wei-Shaw/sub2api/internal/payment/provider"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
+	"github.com/shopspring/decimal"
 )
 
 // --- Order Creation ---
@@ -67,7 +68,7 @@ func (s *PaymentService) CreateOrder(ctx context.Context, req CreateOrderRequest
 			return nil, err
 		}
 	}
-	payAmountStr, payAmount, err := calculateCreateOrderPayAmountForOrder(req.OrderType, limitAmount, feeRate, cfg.BalanceRechargeMultiplier, methodCurrency)
+	payAmountStr, payAmount, err := calculateCreateOrderPayAmountForOrderType(limitAmount, feeRate, methodCurrency, req.OrderType, cfg.BalanceRechargeMultiplier)
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +84,7 @@ func (s *PaymentService) CreateOrder(ctx context.Context, req CreateOrderRequest
 		selectedCurrency = paymentProviderConfigCurrency(sel.ProviderKey, sel.Config)
 	}
 	if selectedCurrency != methodCurrency {
-		payAmountStr, payAmount, err = calculateCreateOrderPayAmountForOrder(req.OrderType, limitAmount, feeRate, cfg.BalanceRechargeMultiplier, selectedCurrency)
+		payAmountStr, payAmount, err = calculateCreateOrderPayAmountForOrderType(limitAmount, feeRate, selectedCurrency, req.OrderType, cfg.BalanceRechargeMultiplier)
 		if err != nil {
 			return nil, err
 		}
@@ -629,17 +630,22 @@ func calculateCreateOrderPayAmount(limitAmount, feeRate float64, currency string
 	return payAmountStr, payAmount, nil
 }
 
-func calculateCreateOrderPayAmountForOrder(orderType string, limitAmount, feeRate, multiplier float64, currency string) (string, float64, error) {
-	paymentAmount := calculateCreateOrderPaymentAmount(orderType, limitAmount, multiplier, currency)
+func calculateCreateOrderPayAmountForOrderType(limitAmount, feeRate float64, currency, orderType string, multiplier float64) (string, float64, error) {
+	paymentAmount := limitAmount
+	if orderType == payment.OrderTypeSubscription {
+		paymentAmount = calculateSubscriptionGatewayBaseAmount(limitAmount, multiplier, currency)
+	}
 	return calculateCreateOrderPayAmount(paymentAmount, feeRate, currency)
 }
 
-func calculateCreateOrderPaymentAmount(orderType string, limitAmount, multiplier float64, currency string) float64 {
-	normalizedCurrency, err := payment.NormalizePaymentCurrency(currency)
-	if err != nil || normalizedCurrency != payment.DefaultPaymentCurrency || orderType != payment.OrderTypeSubscription {
-		return limitAmount
+func calculateSubscriptionGatewayBaseAmount(amount, multiplier float64, currency string) float64 {
+	if currency != payment.DefaultPaymentCurrency {
+		return amount
 	}
-	return calculateGatewayPaymentAmount(limitAmount, multiplier, normalizedCurrency)
+	return decimal.NewFromFloat(amount).
+		Div(decimal.NewFromFloat(normalizeBalanceRechargeMultiplier(multiplier))).
+		Round(int32(payment.CurrencyMaxFractionDigits(currency))).
+		InexactFloat64()
 }
 
 func validateCreateOrderAmountCurrency(amount float64, currency string) error {
