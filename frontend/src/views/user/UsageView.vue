@@ -188,6 +188,7 @@
           default-sort-key="created_at"
           default-sort-order="desc"
           @sort="handleSort"
+          @ipGeoBatchFailed="handleIpGeoBatchFailed"
         >
           <template #cell-api_key="{ row }">
             <span class="text-sm text-gray-900 dark:text-white">{{
@@ -789,6 +790,10 @@ const getRequestTypeBadgeClass = (log: UsageLog): string => {
   return 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200'
 }
 
+
+const handleIpGeoBatchFailed = () => {
+  appStore.showError(t('usage.ipGeo.batchFailed'))
+}
 
 const getRequestTypeExportText = (log: UsageLog): string => {
   const requestType = resolveUsageRequestType(log)

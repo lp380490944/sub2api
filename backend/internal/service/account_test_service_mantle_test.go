@@ -77,8 +77,8 @@ func TestAccountTestService_BedrockMantleUsesNativeMessagesEndpoint(t *testing.T
 	require.Len(t, upstream.requests, 1, "Mantle test must make exactly one native /v1/messages request")
 	req := upstream.requests[0]
 	require.Equal(t, "https://bedrock-mantle.eu-north-1.api.aws/v1/messages", req.URL.String())
-	require.Equal(t, "sk-mantle", req.Header.Get("x-api-key"), "Mantle authenticates with x-api-key")
-	require.Empty(t, req.Header.Get("Authorization"), "Mantle must not use Bearer/SigV4 auth")
+	require.Equal(t, "sk-mantle", getHeaderRaw(req.Header, "x-api-key"), "Mantle authenticates with x-api-key")
+	require.Empty(t, getHeaderRaw(req.Header, "authorization"), "Mantle must not use Bearer/SigV4 auth")
 }
 
 // A Claude Platform on AWS account (auth_mode=claude_platform_aws) is also a
@@ -121,7 +121,7 @@ func TestAccountTestService_ClaudePlatformAWSUsesNativeMessagesEndpoint(t *testi
 	require.Len(t, upstream.requests, 1, "Claude Platform on AWS must make one native /v1/messages request")
 	req := upstream.requests[0]
 	require.Equal(t, "https://aws-external-anthropic.us-east-1.api.aws/v1/messages?beta=true", req.URL.String())
-	require.Equal(t, "sk-cpa", req.Header.Get("x-api-key"))
+	require.Equal(t, "sk-cpa", getHeaderRaw(req.Header, "x-api-key"))
 	require.Equal(t, "wrkspc_abc", req.Header.Get("anthropic-workspace-id"))
-	require.Empty(t, req.Header.Get("Authorization"))
+	require.Empty(t, getHeaderRaw(req.Header, "authorization"))
 }
