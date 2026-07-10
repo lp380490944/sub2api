@@ -538,6 +538,9 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 					)
 					continue
 				}
+				// [fork hotfix] 非 failover 错误(如 400 invalid_request)时 errors.As 未命中、failoverErr 为 nil，
+				// 必须跳过下方切换逻辑(failoverErr.StatusCode 会 nil panic)，落到下方通用 forward_failed 路径。
+				if failoverErr != nil {
 				h.gatewayService.RecordOpenAIAccountSwitch()
 				failedAccountIDs[account.ID] = struct{}{}
 				lastFailoverErr = failoverErr
@@ -577,6 +580,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 					return
 				}
 				continue
+				}
 			}
 			h.gatewayService.ReportOpenAIAccountScheduleResult(account.ID, false, nil)
 			// 若 Forward 已经把上游的终止错误（如 Responses 流上游返回 HTTP 200 +
