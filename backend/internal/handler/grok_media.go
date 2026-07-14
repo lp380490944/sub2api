@@ -343,6 +343,7 @@ func recordGrokMediaUsage(
 	}
 	inboundEndpoint := GetInboundEndpoint(c)
 	upstreamEndpoint := GetUpstreamEndpoint(c, account.Platform)
+	quotaPlatform := service.QuotaPlatform(c.Request.Context(), apiKey)
 	channelUsageFields := service.ChannelUsageFields{
 		OriginalModel:      requestModel,
 		ChannelMappedModel: requestModel,
@@ -360,6 +361,7 @@ func recordGrokMediaUsage(
 			IPAddress:          clientIP,
 			RequestPayloadHash: service.HashUsageRequestPayload(payloadForHash),
 			APIKeyService:      h.apiKeyService,
+			QuotaPlatform:      quotaPlatform,
 			ChannelUsageFields: channelUsageFields,
 		}); err != nil {
 			logger.L().With(

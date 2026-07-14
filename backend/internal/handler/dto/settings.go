@@ -152,19 +152,19 @@ type SystemSettings struct {
 	DefaultSubscriptions         []DefaultSubscriptionSetting `json:"default_subscriptions"`
 
 	// Account sharing hardening runtime knobs.
-	AccountDefaultConcurrency             int `json:"account_default_concurrency"`
-	AccountDefaultRPM                     int `json:"account_default_rpm"`
+	AccountDefaultConcurrency int `json:"account_default_concurrency"`
+	AccountDefaultRPM         int `json:"account_default_rpm"`
 
 	// Upstream Passthrough Policy (Phase A, 2026-05-24)
-	UpstreamPassthroughDefaults       UpstreamPassthroughDefaultsDTO `json:"upstream_passthrough_defaults"`
-	UpstreamPassthroughGlobalOverride string                         `json:"upstream_passthrough_global_override"`
-	UpstreamPolicyV1Enabled           bool                           `json:"upstream_policy_v1_enabled"`
-	LongTermBindingTTLDays                int `json:"ltb_ttl_days"`
-	LongTermBindingCleanupIntervalSeconds int `json:"ltb_cleanup_interval_seconds"`
-	SessionAccountFanoutLimit             int `json:"session_account_fanout_limit"`
-	SessionAccountFanoutWindowSec         int `json:"session_account_fanout_window_sec"`
-	BoundSessionSwitchJitterMinMs         int `json:"bound_session_switch_jitter_min_ms"`
-	BoundSessionSwitchJitterMaxMs         int `json:"bound_session_switch_jitter_max_ms"`
+	UpstreamPassthroughDefaults           UpstreamPassthroughDefaultsDTO `json:"upstream_passthrough_defaults"`
+	UpstreamPassthroughGlobalOverride     string                         `json:"upstream_passthrough_global_override"`
+	UpstreamPolicyV1Enabled               bool                           `json:"upstream_policy_v1_enabled"`
+	LongTermBindingTTLDays                int                            `json:"ltb_ttl_days"`
+	LongTermBindingCleanupIntervalSeconds int                            `json:"ltb_cleanup_interval_seconds"`
+	SessionAccountFanoutLimit             int                            `json:"session_account_fanout_limit"`
+	SessionAccountFanoutWindowSec         int                            `json:"session_account_fanout_window_sec"`
+	BoundSessionSwitchJitterMinMs         int                            `json:"bound_session_switch_jitter_min_ms"`
+	BoundSessionSwitchJitterMaxMs         int                            `json:"bound_session_switch_jitter_max_ms"`
 
 	// Model fallback configuration
 	EnableModelFallback      bool   `json:"enable_model_fallback"`
@@ -206,7 +206,14 @@ type SystemSettings struct {
 	EnableClientDatelineNormalization      bool   `json:"enable_client_dateline_normalization"`
 	AntigravityUserAgentVersion            string `json:"antigravity_user_agent_version"`
 	OpenAICodexUserAgent                   string `json:"openai_codex_user_agent"`
-	OpenAIAllowClaudeCodeCodexPlugin       bool   `json:"openai_allow_claude_code_codex_plugin"`
+
+	// codex_cli_only 加固
+	MinCodexVersion                      string `json:"min_codex_version"`
+	MaxCodexVersion                      string `json:"max_codex_version"`
+	CodexCLIOnlyBlacklist                string `json:"codex_cli_only_blacklist"`
+	CodexCLIOnlyWhitelist                string `json:"codex_cli_only_whitelist"`
+	CodexCLIOnlyAllowAppServerClients    bool   `json:"codex_cli_only_allow_app_server_clients"`
+	CodexCLIOnlyEngineFingerprintSignals string `json:"codex_cli_only_engine_fingerprint_signals"`
 
 	// Web Search Emulation
 	WebSearchEmulationEnabled bool `json:"web_search_emulation_enabled"`
@@ -354,10 +361,14 @@ type PublicSettings struct {
 	BackendModeEnabled               bool                     `json:"backend_mode_enabled"`
 	PaymentEnabled                   bool                     `json:"payment_enabled"`
 	Version                          string                   `json:"version"`
-	BalanceLowNotifyEnabled          bool                     `json:"balance_low_notify_enabled"`
-	AccountQuotaNotifyEnabled        bool                     `json:"account_quota_notify_enabled"`
-	BalanceLowNotifyThreshold        float64                  `json:"balance_low_notify_threshold"`
-	BalanceLowNotifyRechargeURL      string                   `json:"balance_low_notify_recharge_url"`
+	// 服务器全局时区（IANA 名称与当前 UTC 偏移，如 "Asia/Shanghai" / "+08:00"）。
+	// 高峰时段等按服务器本地时间判定的窗口，前端展示时据此标注，避免用户按浏览器本地时间误读。
+	ServerTimezone              string  `json:"server_timezone"`
+	ServerUTCOffset             string  `json:"server_utc_offset"`
+	BalanceLowNotifyEnabled     bool    `json:"balance_low_notify_enabled"`
+	AccountQuotaNotifyEnabled   bool    `json:"account_quota_notify_enabled"`
+	BalanceLowNotifyThreshold   float64 `json:"balance_low_notify_threshold"`
+	BalanceLowNotifyRechargeURL string  `json:"balance_low_notify_recharge_url"`
 
 	ChannelMonitorEnabled                bool `json:"channel_monitor_enabled"`
 	ChannelMonitorDefaultIntervalSeconds int  `json:"channel_monitor_default_interval_seconds"`

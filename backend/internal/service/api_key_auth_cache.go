@@ -100,6 +100,14 @@ type APIKeyAuthGroupSnapshot struct {
 	DefaultAccountConcurrency int    `json:"default_account_concurrency,omitempty"`
 	DefaultAccountRPM         int    `json:"default_account_rpm,omitempty"`
 	Default429CooldownSec     int    `json:"default_429_cooldown_sec,omitempty"`
+
+	// 高峰时段倍率：PeakRateEnabled 为 true 且请求时刻处于 [PeakStart, PeakEnd) 时，
+	// token 计费倍率额外乘以 PeakRateMultiplier（详见 Group.PeakMultiplierAt）。
+	// 必须随快照缓存，否则扣费路径拿到的 apiKey.Group 缺字段、高峰倍率失效。
+	PeakRateEnabled    bool    `json:"peak_rate_enabled"`
+	PeakStart          string  `json:"peak_start"`
+	PeakEnd            string  `json:"peak_end"`
+	PeakRateMultiplier float64 `json:"peak_rate_multiplier"`
 }
 
 // APIKeyAuthCacheEntry 缓存条目，支持负缓存

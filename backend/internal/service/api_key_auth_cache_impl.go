@@ -14,7 +14,7 @@ import (
 	"github.com/dgraph-io/ristretto"
 )
 
-const apiKeyAuthSnapshotVersion = 12 // v12: include exclusive group authorization fields
+const apiKeyAuthSnapshotVersion = 13 // v13: include group peak rate fields
 
 type apiKeyAuthCacheConfig struct {
 	l1Size        int
@@ -280,6 +280,10 @@ func (s *APIKeyService) snapshotFromAPIKey(ctx context.Context, apiKey *APIKey) 
 			DefaultAccountConcurrency:       apiKey.Group.DefaultAccountConcurrency,
 			DefaultAccountRPM:               apiKey.Group.DefaultAccountRPM,
 			Default429CooldownSec:           apiKey.Group.Default429CooldownSec,
+			PeakRateEnabled:                 apiKey.Group.PeakRateEnabled,
+			PeakStart:                       apiKey.Group.PeakStart,
+			PeakEnd:                         apiKey.Group.PeakEnd,
+			PeakRateMultiplier:              apiKey.Group.PeakRateMultiplier,
 		}
 	}
 	return snapshot
@@ -357,6 +361,10 @@ func (s *APIKeyService) snapshotToAPIKey(key string, snapshot *APIKeyAuthSnapsho
 			DefaultAccountConcurrency:       snapshot.Group.DefaultAccountConcurrency,
 			DefaultAccountRPM:               snapshot.Group.DefaultAccountRPM,
 			Default429CooldownSec:           snapshot.Group.Default429CooldownSec,
+			PeakRateEnabled:                 snapshot.Group.PeakRateEnabled,
+			PeakStart:                       snapshot.Group.PeakStart,
+			PeakEnd:                         snapshot.Group.PeakEnd,
+			PeakRateMultiplier:              snapshot.Group.PeakRateMultiplier,
 		}
 	}
 	s.compileAPIKeyIPRules(apiKey)
