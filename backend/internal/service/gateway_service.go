@@ -2674,10 +2674,43 @@ func (s *GatewayService) failoverOnInfraLevel2xx(
 	if s.accountRepo != nil {
 		tempUnscheduleGoogleConfigError(ctx, s.rateLimitService, s.accountRepo, account.ID, "[infra-2xx]")
 	}
-	return &UpstreamFailoverError{
-		StatusCode:   http.StatusBadGateway,
-		ResponseBody: []byte(`{"type":"error","error":{"type":"upstream_invalid_response","message":"upstream returned HTML/empty body with HTTP 200"}}`),
+	// 空 body/真正的 HTML 标记：内容对错误透传规则匹配没有价值，合成一条通用提示。
+	// 仅因 Content-Type 可疑（例如 text/plain 但内容其实是纯文本错误描述）触发时，
+	// 保留原始上游响应体/响应头——与 invalidNonStreamingJSONFailoverError 的行为
+	// 保持一致，ResponseBody 用于错误透传规则匹配（temp_unschedulable_rules 等），
+	// 合成消息会让基于关键字/内容的匹配规则失效。
+	if looksLikeHTMLOrEmptyBody(body) {
+		return &UpstreamFailoverError{
+			StatusCode:   http.StatusBadGateway,
+			ResponseBody: []byte(`{"type":"error","error":{"type":"upstream_invalid_response","message":"upstream returned HTML/empty body with HTTP 200"}}`),
+		}
 	}
+	return &UpstreamFailoverError{
+		StatusCode:      http.StatusBadGateway,
+		ResponseBody:    body,
+		ResponseHeaders: resp.Header,
+	}
+}
+
+// looksLikeHTMLOrEmptyBody 判断 body 本身是否为空或带有真实 HTML 标记
+// （不依赖 Content-Type，因为 Content-Type 只是 isInfraLevelUnexpectedSuccessResponse
+// 判定"疑似基础设施故障"的信号之一，body 本身不一定真的是 HTML）。
+func looksLikeHTMLOrEmptyBody(body []byte) bool {
+	trimmed := bytes.TrimSpace(body)
+	if len(trimmed) == 0 {
+		return true
+	}
+	if trimmed[0] != '<' {
+		return false
+	}
+	head := bytes.ToLower(trimmed)
+	if len(head) > 64 {
+		head = head[:64]
+	}
+	return bytes.HasPrefix(head, []byte("<!doctype")) ||
+		bytes.HasPrefix(head, []byte("<html")) ||
+		bytes.Contains(head, []byte("<head")) ||
+		bytes.Contains(head, []byte("<body"))
 }
 
 // isQuotaExhaustedOn400 检查 400 响应是否为配额/积分耗尽错误。
