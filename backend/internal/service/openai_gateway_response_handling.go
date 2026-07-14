@@ -825,7 +825,13 @@ func (s *OpenAIGatewayService) handleNonStreamingResponse(ctx context.Context, r
 	if isEventStreamResponse(resp.Header) {
 		return s.handleSSEToJSON(resp, c, body, originalModel, mappedModel)
 	}
-	bodyLooksLikeSSE := bytes.Contains(body, []byte("data:")) || bytes.Contains(body, []byte("event:"))
+	// bodyLooksLikeSSE is a line-level heuristic: real SSE framing requires
+	// "data:"/"event:" field names at the very start of a physical line. A
+	// plain bytes.Contains scan would also match ordinary JSON responses
+	// whose string content merely echoes the literal text "data:" or
+	// "event:" (e.g. compact tool output), causing those JSON bodies to be
+	// misrouted into handleSSEToJSON and lose their usage accounting.
+	bodyLooksLikeSSE := bodyHasSSEFraming(body)
 
 	// For OAuth accounts, also fall back to a body-content heuristic because
 	// the upstream may omit the Content-Type header while still sending SSE.

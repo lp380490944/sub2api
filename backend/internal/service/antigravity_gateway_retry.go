@@ -59,12 +59,12 @@ type antigravityRetryLoopResult struct {
 // daily/sandbox 端点仅供内部联调，需显式设置
 // GATEWAY_ANTIGRAVITY_FORWARD_BASE_URL=daily（或 sandbox）才启用。
 func resolveAntigravityForwardBaseURL() string {
-	baseURLs := antigravity.ForwardBaseURLs()
+	baseURLs := antigravity.BaseURLs
 	if len(baseURLs) == 0 {
 		return ""
 	}
 	mode := strings.ToLower(strings.TrimSpace(os.Getenv(antigravityForwardBaseURLEnv)))
-	if mode == "prod" && len(baseURLs) > 1 {
+	if (mode == "daily" || mode == "sandbox") && len(baseURLs) > 1 {
 		return baseURLs[1]
 	}
 	return baseURLs[0]
@@ -785,7 +785,7 @@ const googleConfigErrorCooldown = 1 * time.Minute
 func tempUnscheduleGoogleConfigError(ctx context.Context, rateLimit *RateLimitService, repo AccountRepository, accountID int64, logPrefix string) {
 	if rateLimit == nil {
 		// Fallback: older call paths without rateLimit wired in still get a 1m cooldown.
-		until := time.Now().Add(1 * time.Minute)
+		until := time.Now().Add(googleConfigErrorCooldown)
 		reason := "400: invalid project resource name (auto temp-unschedule 1m)"
 		if err := repo.SetTempUnschedulable(ctx, accountID, until, reason); err != nil {
 			log.Printf("%s temp_unschedule_failed account=%d error=%v", logPrefix, accountID, err)
@@ -815,7 +815,7 @@ const emptyResponseCooldown = 1 * time.Minute
 func tempUnscheduleEmptyResponse(ctx context.Context, rateLimit *RateLimitService, repo AccountRepository, accountID int64, logPrefix string) {
 	if rateLimit == nil {
 		// Fallback: older call paths without rateLimit wired in still get a 1m cooldown.
-		until := time.Now().Add(1 * time.Minute)
+		until := time.Now().Add(emptyResponseCooldown)
 		reason := "empty stream response (auto temp-unschedule 1m)"
 		if err := repo.SetTempUnschedulable(ctx, accountID, until, reason); err != nil {
 			log.Printf("%s temp_unschedule_failed account=%d error=%v", logPrefix, accountID, err)
