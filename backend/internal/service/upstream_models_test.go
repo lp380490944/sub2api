@@ -145,7 +145,7 @@ func TestBuildUpstreamModelsRequestsForAPIKeyAccounts(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Equal(t, "https://anthropic.example.com/v1/models", anthropicReq.URL.String())
-	require.Equal(t, "anthropic-key", anthropicReq.Header.Get("x-api-key"))
+	require.Equal(t, "anthropic-key", getHeaderRaw(anthropicReq.Header, "x-api-key"))
 	require.Equal(t, "2023-06-01", anthropicReq.Header.Get("anthropic-version"))
 
 	anthropicBearerReq, err := svc.buildAnthropicUpstreamModelsRequest(ctx, &Account{

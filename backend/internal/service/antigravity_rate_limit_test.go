@@ -1033,6 +1033,49 @@ func TestResolveAntigravityForwardBaseURL_DefaultDaily(t *testing.T) {
 	require.Equal(t, dailyURL, resolved)
 }
 
+// TestResolveAntigravityForwardBaseURL_ProdIsDefaultWithRealOrdering guards
+// against a merge-resolution regression where resolveAntigravityForwardBaseURL
+// called antigravity.ForwardBaseURLs() (which reorders daily-first) instead of
+// reading antigravity.BaseURLs directly, and treated "prod" as the opt-in
+// value instead of "daily"/"sandbox". With the real BaseURLs ordering
+// (production endpoint first, matching what OAuth login/test-connection use),
+// that bug silently defaulted every gateway request to the daily/sandbox
+// endpoint, which rejects production OAuth tokens with 401 and gets the
+// account temp-unscheduled (see #3611 / #2962). Unlike
+// TestResolveAntigravityForwardBaseURL_DefaultDaily above (which stubs
+// BaseURLs with daily first and therefore can't catch this), this test uses
+// the production-first ordering that ships in antigravity.BaseURLs.
+func TestResolveAntigravityForwardBaseURL_ProdIsDefaultWithRealOrdering(t *testing.T) {
+	oldBaseURLs := append([]string(nil), antigravity.BaseURLs...)
+	defer func() {
+		antigravity.BaseURLs = oldBaseURLs
+	}()
+
+	prodURL := "https://prod.test"
+	dailyURL := "https://daily.test"
+	antigravity.BaseURLs = []string{prodURL, dailyURL}
+
+	t.Run("default env resolves to prod", func(t *testing.T) {
+		t.Setenv(antigravityForwardBaseURLEnv, "")
+		require.Equal(t, prodURL, resolveAntigravityForwardBaseURL())
+	})
+
+	t.Run("mode=daily opts into the daily endpoint", func(t *testing.T) {
+		t.Setenv(antigravityForwardBaseURLEnv, "daily")
+		require.Equal(t, dailyURL, resolveAntigravityForwardBaseURL())
+	})
+
+	t.Run("mode=sandbox opts into the daily endpoint", func(t *testing.T) {
+		t.Setenv(antigravityForwardBaseURLEnv, "sandbox")
+		require.Equal(t, dailyURL, resolveAntigravityForwardBaseURL())
+	})
+
+	t.Run("mode=prod is not a valid opt-in value and stays on prod", func(t *testing.T) {
+		t.Setenv(antigravityForwardBaseURLEnv, "prod")
+		require.Equal(t, prodURL, resolveAntigravityForwardBaseURL())
+	})
+}
+
 func TestAntigravityAccountSwitchError_Error(t *testing.T) {
 	err := &AntigravityAccountSwitchError{
 		OriginalAccountID: 789,
