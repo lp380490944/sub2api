@@ -99,7 +99,7 @@ func TestParseGlobalOverrideMode(t *testing.T) {
 		{"force_transparent", GlobalOverrideForceTransparent},
 		{"force_protected", GlobalOverrideForceProtected},
 		{"force_strict", GlobalOverrideForceStrict},
-		{"garbage", GlobalOverrideAuto}, // invalid -> auto
+		{"garbage", GlobalOverrideAuto},             // invalid -> auto
 		{"FORCE_STRICT", GlobalOverrideForceStrict}, // case-insensitive
 	}
 	for _, c := range cases {

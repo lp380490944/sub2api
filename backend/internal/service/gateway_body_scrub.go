@@ -233,8 +233,8 @@ func RemapToolNames(body []byte) ([]byte, map[string]string) {
 	}
 
 	// 第一趟：扫 tools[]，构建 "drop + rename" 决策表。
-	droppedToolNames := make(map[string]bool)   // 原始名 -> 需要丢弃
-	renameDecisions := make(map[string]string)  // 原始名 -> 新名（不变则 key 不入表）
+	droppedToolNames := make(map[string]bool)  // 原始名 -> 需要丢弃
+	renameDecisions := make(map[string]string) // 原始名 -> 新名（不变则 key 不入表）
 
 	toolsResult := gjson.GetBytes(body, "tools")
 	if toolsResult.IsArray() {

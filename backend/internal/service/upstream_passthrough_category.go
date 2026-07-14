@@ -11,7 +11,7 @@ package service
 //  3. Type == AccountTypeSetupToken → reverse (Claude Code inference-only mode)
 //  4. Type == AccountTypeOAuth on Anthropic/OpenAI → reverse
 //     (conservative: with or without credentials.client marker, since sub2api's
-//      OAuth flows for these platforms predominantly serve client impersonation)
+//     OAuth flows for these platforms predominantly serve client impersonation)
 //  5. Otherwise → official (safest fallback for unknown combinations)
 //
 // nil account → CategoryOfficial (defensive).

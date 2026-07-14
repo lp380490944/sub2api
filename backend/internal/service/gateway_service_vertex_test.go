@@ -73,9 +73,9 @@ func TestBetaPolicyScopeMatches_VertexScope(t *testing.T) {
 func TestBetaPolicyScopeMatches_APIKeyScopeExcludesBedrockAndVertex(t *testing.T) {
 	// apikey scope must not match bedrock or vertex (those have their own scopes)
 	assert.True(t, betaPolicyScopeMatches(BetaPolicyScopeAPIKey, false, false, false))
-	assert.False(t, betaPolicyScopeMatches(BetaPolicyScopeAPIKey, false, true, false))  // bedrock
-	assert.False(t, betaPolicyScopeMatches(BetaPolicyScopeAPIKey, false, false, true))  // vertex
-	assert.False(t, betaPolicyScopeMatches(BetaPolicyScopeAPIKey, true, false, false))  // oauth
+	assert.False(t, betaPolicyScopeMatches(BetaPolicyScopeAPIKey, false, true, false)) // bedrock
+	assert.False(t, betaPolicyScopeMatches(BetaPolicyScopeAPIKey, false, false, true)) // vertex
+	assert.False(t, betaPolicyScopeMatches(BetaPolicyScopeAPIKey, true, false, false)) // oauth
 }
 
 func TestBetaPolicyScopeMatches_BedrockScope_UnchangedByVertexAddition(t *testing.T) {
