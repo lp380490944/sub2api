@@ -759,7 +759,7 @@ func TestHandleFailoverError_EdgeCases(t *testing.T) {
 			err := newTestFailoverErr(500, false, false)
 
 			start := time.Now()
-			action := fs.HandleFailoverError(context.Background(), mock, int64(100+i), "openai", err)
+			action := fs.HandleFailoverError(context.Background(), mock, int64(100+i), "openai", maxSameAccountRetries, err)
 			elapsed := time.Since(start)
 
 			require.Equal(t, FailoverContinue, action)
@@ -779,7 +779,7 @@ func TestHandleFailoverError_EdgeCases(t *testing.T) {
 		err := newTestFailoverErr(500, false, false)
 
 		start := time.Now()
-		action := fs.HandleFailoverError(context.Background(), mock, 100, "openai", err)
+		action := fs.HandleFailoverError(context.Background(), mock, 100, "openai", maxSameAccountRetries, err)
 		elapsed := time.Since(start)
 
 		require.Equal(t, FailoverContinue, action)
@@ -833,7 +833,7 @@ func TestHandleFailoverError_FanoutCap(t *testing.T) {
 		fs := NewFailoverStateWithFanout(5, false, "sess1", &groupID, 2, 0, 0)
 		err := newTestFailoverErr(429, false, false)
 
-		action := fs.HandleFailoverError(context.Background(), mock, 100, "openai", err)
+		action := fs.HandleFailoverError(context.Background(), mock, 100, "openai", maxSameAccountRetries, err)
 
 		require.Equal(t, FailoverContinue, action)
 		require.Len(t, mock.fanoutSets["sess1"], 1)
@@ -847,9 +847,9 @@ func TestHandleFailoverError_FanoutCap(t *testing.T) {
 		err := newTestFailoverErr(429, false, false)
 
 		// 第一次
-		fs.HandleFailoverError(context.Background(), mock, 100, "openai", err)
+		fs.HandleFailoverError(context.Background(), mock, 100, "openai", maxSameAccountRetries, err)
 		// 第二次 - 不同账号
-		action := fs.HandleFailoverError(context.Background(), mock, 200, "openai", err)
+		action := fs.HandleFailoverError(context.Background(), mock, 200, "openai", maxSameAccountRetries, err)
 
 		require.Equal(t, FailoverContinue, action)
 		require.Len(t, mock.fanoutSets["sess1"], 2)
@@ -862,10 +862,10 @@ func TestHandleFailoverError_FanoutCap(t *testing.T) {
 		err := newTestFailoverErr(429, false, false)
 
 		// 前两次
-		fs.HandleFailoverError(context.Background(), mock, 100, "openai", err)
-		fs.HandleFailoverError(context.Background(), mock, 200, "openai", err)
+		fs.HandleFailoverError(context.Background(), mock, 100, "openai", maxSameAccountRetries, err)
+		fs.HandleFailoverError(context.Background(), mock, 200, "openai", maxSameAccountRetries, err)
 		// 第三次 - 超限
-		action := fs.HandleFailoverError(context.Background(), mock, 300, "openai", err)
+		action := fs.HandleFailoverError(context.Background(), mock, 300, "openai", maxSameAccountRetries, err)
 
 		require.Equal(t, FailoverExhausted, action)
 		// 第三个账号也应该被记录
@@ -879,9 +879,9 @@ func TestHandleFailoverError_FanoutCap(t *testing.T) {
 		err := newTestFailoverErr(429, false, false)
 
 		// 账号100失败多次
-		fs.HandleFailoverError(context.Background(), mock, 100, "openai", err)
-		fs.HandleFailoverError(context.Background(), mock, 100, "openai", err)
-		fs.HandleFailoverError(context.Background(), mock, 100, "openai", err)
+		fs.HandleFailoverError(context.Background(), mock, 100, "openai", maxSameAccountRetries, err)
+		fs.HandleFailoverError(context.Background(), mock, 100, "openai", maxSameAccountRetries, err)
+		fs.HandleFailoverError(context.Background(), mock, 100, "openai", maxSameAccountRetries, err)
 
 		// fanout set 仍只有 1 个账号
 		require.Len(t, mock.fanoutSets["sess1"], 1)
@@ -894,9 +894,9 @@ func TestHandleFailoverError_FanoutCap(t *testing.T) {
 		err := newTestFailoverErr(429, false, false)
 
 		// 即使多个账号也不会触发 fanout exhausted
-		fs.HandleFailoverError(context.Background(), mock, 100, "openai", err)
-		fs.HandleFailoverError(context.Background(), mock, 200, "openai", err)
-		action := fs.HandleFailoverError(context.Background(), mock, 300, "openai", err)
+		fs.HandleFailoverError(context.Background(), mock, 100, "openai", maxSameAccountRetries, err)
+		fs.HandleFailoverError(context.Background(), mock, 200, "openai", maxSameAccountRetries, err)
+		action := fs.HandleFailoverError(context.Background(), mock, 300, "openai", maxSameAccountRetries, err)
 
 		require.Equal(t, FailoverContinue, action) // 没有触发 fanout exhausted
 	})
@@ -908,9 +908,9 @@ func TestHandleFailoverError_FanoutCap(t *testing.T) {
 		err := newTestFailoverErr(429, false, false)
 
 		// 即使多个账号也不会触发 fanout exhausted
-		fs.HandleFailoverError(context.Background(), mock, 100, "openai", err)
-		fs.HandleFailoverError(context.Background(), mock, 200, "openai", err)
-		action := fs.HandleFailoverError(context.Background(), mock, 300, "openai", err)
+		fs.HandleFailoverError(context.Background(), mock, 100, "openai", maxSameAccountRetries, err)
+		fs.HandleFailoverError(context.Background(), mock, 200, "openai", maxSameAccountRetries, err)
+		action := fs.HandleFailoverError(context.Background(), mock, 300, "openai", maxSameAccountRetries, err)
 
 		require.Equal(t, FailoverContinue, action)
 	})
@@ -921,9 +921,9 @@ func TestHandleFailoverError_FanoutCap(t *testing.T) {
 		err := newTestFailoverErr(429, false, false)
 
 		// 多个账号
-		fs.HandleFailoverError(context.Background(), mock, 100, "openai", err)
-		fs.HandleFailoverError(context.Background(), mock, 200, "openai", err)
-		action := fs.HandleFailoverError(context.Background(), mock, 300, "openai", err)
+		fs.HandleFailoverError(context.Background(), mock, 100, "openai", maxSameAccountRetries, err)
+		fs.HandleFailoverError(context.Background(), mock, 200, "openai", maxSameAccountRetries, err)
+		action := fs.HandleFailoverError(context.Background(), mock, 300, "openai", maxSameAccountRetries, err)
 
 		require.Equal(t, FailoverContinue, action)
 		// fanout set 应为空（未调用 RecordSessionFanout）
@@ -940,7 +940,7 @@ func TestHandleFailoverError_BoundSessionJitter(t *testing.T) {
 		err := newTestFailoverErr(500, false, false)
 
 		start := time.Now()
-		action := fs.HandleFailoverError(context.Background(), mock, 100, "openai", err)
+		action := fs.HandleFailoverError(context.Background(), mock, 100, "openai", maxSameAccountRetries, err)
 		elapsed := time.Since(start)
 
 		require.Equal(t, FailoverContinue, action)
@@ -957,7 +957,7 @@ func TestHandleFailoverError_BoundSessionJitter(t *testing.T) {
 		err := newTestFailoverErr(500, false, false)
 
 		start := time.Now()
-		action := fs.HandleFailoverError(context.Background(), mock, 100, "openai", err)
+		action := fs.HandleFailoverError(context.Background(), mock, 100, "openai", maxSameAccountRetries, err)
 		elapsed := time.Since(start)
 
 		require.Equal(t, FailoverContinue, action)
