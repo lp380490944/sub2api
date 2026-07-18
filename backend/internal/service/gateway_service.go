@@ -621,19 +621,80 @@ type ForwardResult struct {
 	ImageSizeBreakdown map[string]int
 }
 
-// UpstreamFailoverError indicates an upstream error that should trigger account failover.
+// GatewayFailureStage identifies which request stage failed. The zero value is
+// intentionally treated as inference so existing UpstreamFailoverError callers
+// retain their current behavior.
+type GatewayFailureStage string
+
+const (
+	GatewayFailureStageInference   GatewayFailureStage = "inference"
+	GatewayFailureStageAccountAuth GatewayFailureStage = "account_auth"
+)
+
+// GatewayFailureScope identifies whether selecting another account can help.
+type GatewayFailureScope string
+
+const (
+	GatewayFailureScopeAccount  GatewayFailureScope = "account"
+	GatewayFailureScopeProvider GatewayFailureScope = "provider"
+	GatewayFailureScopeRequest  GatewayFailureScope = "request"
+)
+
+// NextAccountAction is tri-state for backwards compatibility. The zero value
+// means legacy retry behavior; only NextAccountStop explicitly short-circuits.
+type NextAccountAction uint8
+
+const (
+	NextAccountLegacyRetry NextAccountAction = iota
+	NextAccountRetry
+	NextAccountStop
+)
+
+type GatewayFailureReason string
+
+// UpstreamFailoverError indicates an upstream or credential error that may
+// trigger account failover. Additive metadata keeps existing composite literals
+// source-compatible and preserves their legacy retry-next-account behavior.
 type UpstreamFailoverError struct {
-	StatusCode             int
-	ResponseBody           []byte      // 上游响应体，用于错误透传规则匹配
-	ResponseHeaders        http.Header // 上游响应头，用于透传 cf-ray/cf-mitigated/content-type 等诊断信息
-	ForceCacheBilling      bool        // Antigravity 粘性会话切换时设为 true
-	RetryableOnSameAccount bool        // 临时性错误（如 Google 间歇性 400、空响应），应在同一账号上重试 N 次再切换
-	QuotaExhausted         bool        // 上游账号配额/积分/余额耗尽，应清除粘性会话绑定
-	SoftRateLimitOnExhaust bool        // Bedrock 区域池：全部耗尽时把 429 呈现为可重试的 503 overloaded，避免客户端看到硬限流
+	StatusCode               int
+	ResponseBody             []byte      // 上游响应体，用于错误透传规则匹配
+	ResponseHeaders          http.Header // 上游响应头，用于透传 cf-ray/cf-mitigated/content-type 等诊断信息
+	ForceCacheBilling        bool        // Antigravity 粘性会话切换时设为 true
+	RetryableOnSameAccount   bool        // 临时性错误（如 Google 间歇性 400、空响应），应在同一账号上重试 N 次再切换
+	QuotaExhausted           bool        // 上游账号配额/积分/余额耗尽，应清除粘性会话绑定
+	SoftRateLimitOnExhaust   bool        // Bedrock 区域池：全部耗尽时把 429 呈现为可重试的 503 overloaded，避免客户端看到硬限流
+	SafeToFailoverAfterWrite bool        // 仅写出 SSE 注释等非语义字节时，仍可在同一客户端流中切换账号
+	Stage                    GatewayFailureStage
+	Scope                    GatewayFailureScope
+	Reason                   GatewayFailureReason
+	NextAccountAction        NextAccountAction
+	ClientStatusCode         int
+	ClientMessage            string
 }
 
 func (e *UpstreamFailoverError) Error() string {
+	if e != nil && e.Stage == GatewayFailureStageAccountAuth {
+		return fmt.Sprintf("credential failure: %s (failover)", e.Reason)
+	}
 	return fmt.Sprintf("upstream error: %d (failover)", e.StatusCode)
+}
+
+func (e *UpstreamFailoverError) ShouldRetryNextAccount() bool {
+	return e != nil && e.NextAccountAction != NextAccountStop
+}
+
+func (e *UpstreamFailoverError) IsCredentialFailure() bool {
+	return e != nil && e.Stage == GatewayFailureStageAccountAuth
+}
+
+// ShouldReportAccountScheduleFailure prevents provider- and request-scoped
+// credential failures from being misattributed to the selected account. Legacy
+// and inference failures retain their existing scheduler-health behavior.
+func (e *UpstreamFailoverError) ShouldReportAccountScheduleFailure() bool {
+	if e == nil {
+		return false
+	}
+	return !e.IsCredentialFailure() || e.Scope == GatewayFailureScopeAccount
 }
 
 // sseStreamErrorEventError 表示上游 SSE 流体内出现 event:error 帧。
@@ -1033,6 +1094,12 @@ func (s *GatewayService) ClearSessionFanout(ctx context.Context, groupID *int64,
 
 // GetSessionFanoutConfig 返回 fanout 限制配置，供 handler 层传递给 FailoverState。
 func (s *GatewayService) GetSessionFanoutConfig() (limit int, boundJitterMin, boundJitterMax time.Duration) {
+	// 该方法通过 sessionFanoutConfigProvider 接口调用；调用方的 provider == nil 检查
+	// 无法拦截"接口里装着 typed nil 指针"的情况，因此这里必须自己兜底。
+	// limit=0 会让调用方按"fanout 未启用"处理。
+	if s == nil {
+		return 0, 0, 0
+	}
 	if s.cfg != nil {
 		limit = s.cfg.Gateway.SessionAccountFanoutLimit
 	}

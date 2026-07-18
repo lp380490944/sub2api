@@ -441,6 +441,8 @@ func scanUsageLog(scanner interface{ Scan(...any) error }) (*service.UsageLog, e
 		cacheCreation1h           int
 		imageOutputTokens         int
 		imageOutputCost           float64
+		imageInputTokens          int
+		imageInputCost            float64
 		inputCost                 float64
 		outputCost                float64
 		cacheCreationCost         float64
@@ -500,6 +502,8 @@ func scanUsageLog(scanner interface{ Scan(...any) error }) (*service.UsageLog, e
 		&cacheCreation1h,
 		&imageOutputTokens,
 		&imageOutputCost,
+		&imageInputTokens,
+		&imageInputCost,
 		&inputCost,
 		&outputCost,
 		&cacheCreationCost,
@@ -557,6 +561,8 @@ func scanUsageLog(scanner interface{ Scan(...any) error }) (*service.UsageLog, e
 		CacheCreation1hTokens:     cacheCreation1h,
 		ImageOutputTokens:         imageOutputTokens,
 		ImageOutputCost:           imageOutputCost,
+		ImageInputTokens:          imageInputTokens,
+		ImageInputCost:            imageInputCost,
 		InputCost:                 inputCost,
 		OutputCost:                outputCost,
 		CacheCreationCost:         cacheCreationCost,
