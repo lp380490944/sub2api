@@ -837,6 +837,39 @@ func tempUnscheduleEmptyResponse(ctx context.Context, rateLimit *RateLimitServic
 	}
 }
 
+// transportErrorCooldown 传输层错误（dial 失败/连接被拒绝/DNS 失败等，upstream client
+// 直接返回 err 而非 HTTP 响应）的兜底封禁时长；rateLimit 非空时实际时长走
+// triggerTempUnschedulableWithBackoff 的指数退避（[1,5,15,30,60] 分钟）。
+const transportErrorCooldown = 1 * time.Minute
+
+// tempUnscheduleUpstreamTransportError 对传输层错误（如某个区域 TCP 不可达的 Bedrock
+// 账号）触发临时封禁，避免账号无限期保持 IsSchedulable()==true，被轮询调度或粘性
+// 会话反复命中同一个死账号。
+func tempUnscheduleUpstreamTransportError(ctx context.Context, rateLimit *RateLimitService, repo AccountRepository, accountID int64, errMsg string, logPrefix string) {
+	if rateLimit == nil {
+		// Fallback：老调用路径未接入 rateLimit 时，退化为固定 1 分钟封禁。
+		until := time.Now().Add(transportErrorCooldown)
+		reason := "upstream transport error (auto temp-unschedule 1m): " + errMsg
+		if err := repo.SetTempUnschedulable(ctx, accountID, until, reason); err != nil {
+			log.Printf("%s temp_unschedule_failed account=%d error=%v", logPrefix, accountID, err)
+		} else {
+			log.Printf("%s temp_unscheduled account=%d until=%v reason=%q", logPrefix, accountID, until.Format("15:04:05"), reason)
+		}
+		return
+	}
+	account, err := repo.GetByID(ctx, accountID)
+	if err != nil || account == nil {
+		log.Printf("%s temp_unschedule_backoff_account_lookup_failed account=%d error=%v", logPrefix, accountID, err)
+		return
+	}
+	if ok := rateLimit.triggerTempUnschedulableWithBackoff(
+		ctx, account, 0, "transport error",
+		"upstream transport error: "+errMsg, nil, -1,
+	); ok {
+		log.Printf("%s temp_unscheduled_backoff account=%d reason=upstream_transport_error", logPrefix, accountID)
+	}
+}
+
 // sleepAntigravityBackoffWithContext 带 context 取消检查的退避等待
 // 返回 true 表示正常完成等待，false 表示 context 已取消
 func sleepAntigravityBackoffWithContext(ctx context.Context, attempt int) bool {

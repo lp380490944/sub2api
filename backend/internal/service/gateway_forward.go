@@ -475,7 +475,6 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 			if resp != nil && resp.Body != nil {
 				_ = resp.Body.Close()
 			}
-			// Ensure the client receives an error response (handlers assume Forward writes on non-failover errors).
 			safeErr := sanitizeUpstreamErrorMessage(err.Error())
 			setOpsUpstreamError(c, 0, safeErr, "")
 			appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
@@ -487,15 +486,25 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 				Kind:               "request_error",
 				Message:            safeErr,
 			})
-			c.JSON(http.StatusBadGateway, gin.H{
-				"type": "error",
-				"error": gin.H{
-					"type":    "upstream_error",
-					"message": "Upstream request failed",
-				},
-			})
-			MarkForwardResponseFinalized(c)
-			return nil, fmt.Errorf("upstream request failed: %s", safeErr)
+
+			// 客户端已断开：不切号、不临时封禁账号——上游根本没机会暴露真实故障，
+			// 切换到另一个账号只会浪费一次无人等待结果的上游调用。
+			if errors.Is(err, context.Canceled) {
+				return nil, err
+			}
+
+			// 传输层失败（dial tcp 不可达/连接被拒绝/DNS 失败等——DoWithTLS 直接返回
+			// err 而不是 HTTP 响应）。此前这里直接给客户端写 502 并返回普通 error：
+			// handler 的 failover 循环只识别 *UpstreamFailoverError，普通 error 不会
+			// 触发切号，账号会永远保持 IsSchedulable()==true，被轮询调度或粘性会话
+			// 反复命中同一个死账号（例如某个区域 TCP 不可达的 Bedrock 账号）。
+			// 改为返回 *UpstreamFailoverError 触发 handler 切换到下一个账号，并对该
+			// 账号做临时封禁，避免它在退避窗口内被反复调度。
+			tempUnscheduleUpstreamTransportError(ctx, s.rateLimitService, s.accountRepo, account.ID, safeErr, "[forward]")
+			return nil, &UpstreamFailoverError{
+				StatusCode:   http.StatusBadGateway,
+				ResponseBody: []byte(`{"type":"error","error":{"type":"upstream_error","message":"Upstream request failed"}}`),
+			}
 		}
 
 		// 优先检测thinking block签名错误（400）并重试一次
