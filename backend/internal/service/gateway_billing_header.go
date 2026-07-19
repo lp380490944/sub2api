@@ -90,18 +90,18 @@ func signBillingHeaderCCH(body []byte) []byte {
 		text := item.Get("text")
 		if text.Exists() && text.Type == gjson.String &&
 			strings.HasPrefix(text.String(), "x-anthropic-billing-header") {
-			
+
 			newText := text.String()
-			
+
 			// 1. Remove cch=... placeholder since true Claude Code does not use it
 			newText = replaceCchRe.ReplaceAllString(newText, "")
-			
+
 			// 2. Rewrite cc_version to include the true SHA256 fingerprint suffix
 			if versionStr != "" && fp != "" {
 				replacement := "cc_version=" + versionStr + "." + fp
 				newText = replaceCcVersionRe.ReplaceAllString(newText, replacement)
 			}
-			
+
 			if newText != text.String() {
 				if updated, err := sjson.SetBytes(body, fmt.Sprintf("system.%d.text", idx), newText); err == nil {
 					body = updated

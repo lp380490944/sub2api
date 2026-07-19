@@ -75,7 +75,7 @@ func TestSignBillingHeaderCCH(t *testing.T) {
 		result := signBillingHeaderCCH(body)
 
 		billingText := gjson.GetBytes(result, "system.0.text").String()
-		
+
 		// Should not have the cch= placeholder anymore at all
 		assert.NotContains(t, billingText, "cch=")
 
@@ -122,4 +122,3 @@ func TestSignBillingHeaderCCH(t *testing.T) {
 		require.Len(t, fp2, 3)
 	})
 }
-

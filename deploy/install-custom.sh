@@ -32,6 +32,22 @@ INSTALL_DIR="/opt/sub2api"
 IMAGE_NAME="sub2api-custom"
 COMPOSE_PROJECT="sub2api"
 
+# Health-check wait budget (seconds) used by the upgrade/rollback polling
+# loops below. Migration-heavy upgrades (e.g. a non-transactional
+# CREATE INDEX CONCURRENTLY on a large table like usage_logs) can leave the
+# new container "starting" for many minutes while migrations run in the
+# background; too short a window here causes a spurious rollback of an
+# otherwise-healthy deploy. Override per-run, e.g.:
+#   HEALTH_TIMEOUT=1200 sudo -E bash deploy/install-custom.sh upgrade
+HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-600}"
+# Guard against a non-numeric or non-positive override so the retry loops
+# below never end up with a zero/garbage iteration count.
+if ! [[ "$HEALTH_TIMEOUT" =~ ^[0-9]+$ ]] || [ "$HEALTH_TIMEOUT" -le 0 ]; then
+    HEALTH_TIMEOUT=600
+fi
+# Loops below sleep 2s per iteration.
+HEALTH_RETRIES=$((HEALTH_TIMEOUT / 2))
+
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -365,9 +381,9 @@ start_services() {
     docker compose -p "$COMPOSE_PROJECT" up -d
 
     # Wait for health check
-    print_info "Waiting for services to become healthy..."
+    print_info "Waiting for services to become healthy (max ${HEALTH_TIMEOUT}s)..."
     local retries=0
-    while [ $retries -lt 30 ]; do
+    while [ $retries -lt "$HEALTH_RETRIES" ]; do
         if docker compose -p "$COMPOSE_PROJECT" ps --format json 2>/dev/null | grep -q '"Health":"healthy"'; then
             break
         fi
@@ -423,9 +439,9 @@ do_rollback() {
     print_info "Restarting sub2api container..."
     docker compose -p "$COMPOSE_PROJECT" up -d sub2api
 
-    print_info "Waiting for health check (max 60s)..."
+    print_info "Waiting for health check (max ${HEALTH_TIMEOUT}s)..."
     local retries=0
-    while [ $retries -lt 30 ]; do
+    while [ $retries -lt "$HEALTH_RETRIES" ]; do
         local status
         status=$(docker inspect --format '{{.State.Health.Status}}' sub2api 2>/dev/null || echo "starting")
         if [ "$status" = "healthy" ]; then
@@ -437,7 +453,7 @@ do_rollback() {
         retries=$((retries + 1))
     done
 
-    print_error "Rollback container failed health check after 60s."
+    print_error "Rollback container failed health check after ${HEALTH_TIMEOUT}s."
     print_error "Check logs: docker compose -p ${COMPOSE_PROJECT} logs sub2api"
     exit 1
 }
@@ -510,7 +526,12 @@ _upgrade_fast_resolve_versions() {
         local api_response
         if ! api_response=$(curl -fsSL --max-time 30 \
             "https://api.github.com/repos/${GITHUB_REPO}/releases/latest" 2>/dev/null); then
-            print_warning "GitHub API unreachable or no releases yet."
+            print_warning "=============================================================="
+            print_warning "Could not reach the GitHub Releases API (or no release exists yet)."
+            print_warning "Likely cause: network/DNS/firewall blocking github.com, or GitHub"
+            print_warning "API rate limiting. Falling back to a FULL SOURCE BUILD, which is"
+            print_warning "much slower (~10 minutes) than the prebuilt-binary fast path."
+            print_warning "=============================================================="
             if [ "${NO_RELEASE_FALLBACK:-0}" = "1" ]; then
                 print_error "NO_RELEASE_FALLBACK=1 set; not falling back to source build."
                 exit 1
@@ -582,7 +603,12 @@ _upgrade_fast_download() {
 
     if [ ! -s "$STAGE_DIR/checksums.txt" ]; then
         rm -rf "$STAGE_DIR"
-        print_warning "Failed to download checksums.txt."
+        print_warning "=============================================================="
+        print_warning "Failed to download checksums.txt from GitHub Releases."
+        print_warning "Likely cause: network/DNS/firewall blocking github.com, or GitHub"
+        print_warning "API rate limiting. Falling back to a FULL SOURCE BUILD, which is"
+        print_warning "much slower (~10 minutes) than the prebuilt-binary fast path."
+        print_warning "=============================================================="
         if [ "${NO_RELEASE_FALLBACK:-0}" = "1" ]; then
             print_error "NO_RELEASE_FALLBACK=1 set; not falling back."
             exit 1
@@ -644,7 +670,12 @@ _upgrade_fast_download() {
 
     if [ -z "$asset" ] || [ ! -s "$STAGE_DIR/$asset" ] || [ ! -s "$STAGE_DIR/checksums.txt" ]; then
         rm -rf "$STAGE_DIR"
+        print_warning "=============================================================="
         print_warning "Failed to download release assets after trying all known filenames."
+        print_warning "Likely cause: network/DNS/firewall blocking github.com, or GitHub"
+        print_warning "API rate limiting. Falling back to a FULL SOURCE BUILD, which is"
+        print_warning "much slower (~10 minutes) than the prebuilt-binary fast path."
+        print_warning "=============================================================="
         if [ "${NO_RELEASE_FALLBACK:-0}" = "1" ]; then
             print_error "NO_RELEASE_FALLBACK=1 set; not falling back."
             exit 1
@@ -729,10 +760,10 @@ _upgrade_fast_switch() {
     ensure_compose_override
     docker compose -p "$COMPOSE_PROJECT" up -d sub2api
 
-    print_info "Waiting for health check (max 60s)..."
+    print_info "Waiting for health check (max ${HEALTH_TIMEOUT}s)..."
     local retries=0
     local healthy=0
-    while [ $retries -lt 30 ]; do
+    while [ $retries -lt "$HEALTH_RETRIES" ]; do
         local status
         status=$(docker inspect --format '{{.State.Health.Status}}' sub2api 2>/dev/null || echo "starting")
         if [ "$status" = "healthy" ]; then
@@ -750,7 +781,7 @@ _upgrade_fast_switch() {
     fi
 
     # Auto-rollback
-    print_error "New container failed health check after 60s. Rolling back..."
+    print_error "New container failed health check after ${HEALTH_TIMEOUT}s. Rolling back..."
     if docker image inspect "${IMAGE_NAME}:previous" >/dev/null 2>&1; then
         docker tag "${IMAGE_NAME}:previous" "${IMAGE_NAME}:latest"
         docker compose -p "$COMPOSE_PROJECT" up -d sub2api
@@ -765,6 +796,12 @@ _upgrade_fast_switch() {
     print_error "  sudo bash $INSTALL_DIR/deploy/fix-migration-checksums.sh          # dry-run report"
     print_error "  sudo bash $INSTALL_DIR/deploy/fix-migration-checksums.sh --apply  # write fixes"
     print_error "then retry the upgrade."
+    print_error ""
+    print_error "If instead this upgrade shipped many DB migrations (e.g. a large"
+    print_error "CREATE INDEX CONCURRENTLY on usage_logs), the container may simply"
+    print_error "still be migrating and need a longer health-check window than"
+    print_error "HEALTH_TIMEOUT=${HEALTH_TIMEOUT}s. Retry with more time, e.g.:"
+    print_error "  HEALTH_TIMEOUT=1200 sudo -E bash $INSTALL_DIR/deploy/install-custom.sh upgrade"
     rm -rf "$STAGE_DIR"
     exit 1
 }

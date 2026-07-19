@@ -5,10 +5,10 @@ import "strings"
 // UpstreamCategory categorizes an upstream account by its relationship to the
 // real upstream endpoint. Determined at runtime by DeriveUpstreamCategory.
 //
-// - relay:    points at another aggregator/relay; minimal protection needed
-// - official: vendor-issued credentials on vendor's official API; standard hygiene
-// - reverse:  impersonates a known client (Kiro/Antigravity/Claude Code/Codex);
-//             must match the client's request fingerprint or risk ban
+//   - relay:    points at another aggregator/relay; minimal protection needed
+//   - official: vendor-issued credentials on vendor's official API; standard hygiene
+//   - reverse:  impersonates a known client (Kiro/Antigravity/Claude Code/Codex);
+//     must match the client's request fingerprint or risk ban
 type UpstreamCategory string
 
 const (

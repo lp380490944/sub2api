@@ -21,8 +21,8 @@ type ResponseCacheStore interface {
 // When temperature=0 (deterministic), identical requests produce identical outputs,
 // so we can cache and replay the full HTTP response (including SSE streams).
 type ResponseCacheService struct {
-	store      ResponseCacheStore
-	ttl        time.Duration
+	store        ResponseCacheStore
+	ttl          time.Duration
 	maxSizeBytes int
 }
 

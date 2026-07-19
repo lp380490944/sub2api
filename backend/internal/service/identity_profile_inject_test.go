@@ -165,11 +165,11 @@ func TestApplyIdentityProfileToAnthropicBody_InvalidUserID(t *testing.T) {
 	c := newGinContextWithUserID(42)
 
 	cases := []string{
-		`{"metadata":{"user_id":"random-junk"}}`,                 // 既不是 JSON 也不是 legacy
-		`{"metadata":{"user_id":""}}`,                            // 空
-		`{"metadata":{}}`,                                        // 无 user_id
-		`{}`,                                                     // 无 metadata
-		`{"metadata":{"user_id":"{\"device_id\":\"\"}"}}`,        // JSON 但 device_id 空
+		`{"metadata":{"user_id":"random-junk"}}`, // 既不是 JSON 也不是 legacy
+		`{"metadata":{"user_id":""}}`,            // 空
+		`{"metadata":{}}`,                        // 无 user_id
+		`{}`,                                     // 无 metadata
+		`{"metadata":{"user_id":"{\"device_id\":\"\"}"}}`, // JSON 但 device_id 空
 	}
 	for i, body := range cases {
 		out := svc.applyIdentityProfileToAnthropicBody(c, []byte(body))

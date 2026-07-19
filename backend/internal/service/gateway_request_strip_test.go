@@ -25,13 +25,13 @@ func TestStripOpenAIToolSchemaArtifacts(t *testing.T) {
 			wantChange: false,
 		},
 		{
-			name: "tool without artifacts — unchanged",
-			body: `{"model":"claude-3","tools":[{"name":"read","input_schema":{"type":"object","properties":{"path":{"type":"string"}}}}]}`,
+			name:       "tool without artifacts — unchanged",
+			body:       `{"model":"claude-3","tools":[{"name":"read","input_schema":{"type":"object","properties":{"path":{"type":"string"}}}}]}`,
 			wantChange: false,
 		},
 		{
-			name: "strips additionalProperties from input_schema",
-			body: `{"model":"claude-3","tools":[{"name":"read","input_schema":{"type":"object","properties":{"path":{"type":"string"}},"additionalProperties":false}}]}`,
+			name:       "strips additionalProperties from input_schema",
+			body:       `{"model":"claude-3","tools":[{"name":"read","input_schema":{"type":"object","properties":{"path":{"type":"string"}},"additionalProperties":false}}]}`,
 			wantChange: true,
 			check: func(t *testing.T, result []byte) {
 				require.False(t, gjson.GetBytes(result, "tools.0.input_schema.additionalProperties").Exists())
@@ -39,8 +39,8 @@ func TestStripOpenAIToolSchemaArtifacts(t *testing.T) {
 			},
 		},
 		{
-			name: "strips $schema from input_schema",
-			body: `{"model":"claude-3","tools":[{"name":"read","input_schema":{"$schema":"http://json-schema.org/draft-07/schema#","type":"object","properties":{}}}]}`,
+			name:       "strips $schema from input_schema",
+			body:       `{"model":"claude-3","tools":[{"name":"read","input_schema":{"$schema":"http://json-schema.org/draft-07/schema#","type":"object","properties":{}}}]}`,
 			wantChange: true,
 			check: func(t *testing.T, result []byte) {
 				schema := gjson.GetBytes(result, "tools.0.input_schema")
@@ -53,8 +53,8 @@ func TestStripOpenAIToolSchemaArtifacts(t *testing.T) {
 			},
 		},
 		{
-			name: "strips nested additionalProperties in properties",
-			body: `{"model":"claude-3","tools":[{"name":"t","input_schema":{"type":"object","properties":{"nested":{"type":"object","additionalProperties":false,"properties":{"x":{"type":"string"}}}}}}]}`,
+			name:       "strips nested additionalProperties in properties",
+			body:       `{"model":"claude-3","tools":[{"name":"t","input_schema":{"type":"object","properties":{"nested":{"type":"object","additionalProperties":false,"properties":{"x":{"type":"string"}}}}}}]}`,
 			wantChange: true,
 			check: func(t *testing.T, result []byte) {
 				require.False(t, gjson.GetBytes(result, "tools.0.input_schema.properties.nested.additionalProperties").Exists())
@@ -62,8 +62,8 @@ func TestStripOpenAIToolSchemaArtifacts(t *testing.T) {
 			},
 		},
 		{
-			name: "strips from items (array schema)",
-			body: `{"model":"claude-3","tools":[{"name":"t","input_schema":{"type":"array","items":{"type":"object","additionalProperties":false}}}]}`,
+			name:       "strips from items (array schema)",
+			body:       `{"model":"claude-3","tools":[{"name":"t","input_schema":{"type":"array","items":{"type":"object","additionalProperties":false}}}]}`,
 			wantChange: true,
 			check: func(t *testing.T, result []byte) {
 				require.False(t, gjson.GetBytes(result, "tools.0.input_schema.items.additionalProperties").Exists())

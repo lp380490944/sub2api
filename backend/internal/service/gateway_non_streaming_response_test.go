@@ -27,6 +27,12 @@ func (r *nonJSONTempUnschedAccountRepo) SetTempUnschedulable(_ context.Context, 
 	return nil
 }
 
+func (r *nonJSONTempUnschedAccountRepo) SetTempUnschedulableWithStep(_ context.Context, _ int64, _ time.Time, reason string, _ int) error {
+	r.tempUnschedCalls++
+	r.tempReason = reason
+	return nil
+}
+
 func TestHandleNonStreamingResponse_NonJSON2xxTriggersFailover(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	rec := httptest.NewRecorder()
