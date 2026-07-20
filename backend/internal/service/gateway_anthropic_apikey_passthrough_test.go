@@ -1388,21 +1388,29 @@ func TestGatewayService_AnthropicAPIKeyPassthrough_ForwardDirect_UpstreamRequest
 	upstream := &anthropicHTTPUpstreamRecorder{
 		err: errors.New("dial tcp timeout"),
 	}
+	account := newAnthropicAPIKeyAccountForTest()
+	repo := &transportErrAccountRepoStub{account: account}
 	svc := &GatewayService{
 		cfg: &config.Config{
 			Security: config.SecurityConfig{
 				URLAllowlist: config.URLAllowlistConfig{Enabled: false},
 			},
 		},
-		httpUpstream: upstream,
+		httpUpstream:     upstream,
+		accountRepo:      repo,
+		rateLimitService: &RateLimitService{accountRepo: repo},
 	}
-	account := newAnthropicAPIKeyAccountForTest()
 
 	result, err := svc.forwardAnthropicAPIKeyPassthrough(context.Background(), c, account, []byte(`{"model":"x"}`), "x", "x", false, time.Now())
 	require.Nil(t, result)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "upstream request failed")
-	require.Equal(t, http.StatusBadGateway, rec.Code)
+	// 传输层失败必须返回 *UpstreamFailoverError（触发 handler 切号）且不直接写响应，
+	// 同时临时封禁该账号（与主 Forward() 路径 dc0bf76b7 行为一致）。
+	var fo *UpstreamFailoverError
+	require.True(t, errors.As(err, &fo))
+	require.Equal(t, http.StatusBadGateway, fo.StatusCode)
+	require.Equal(t, 0, rec.Body.Len())
+	require.Len(t, repo.stepCalls, 1)
 }
 
 func TestGatewayService_AnthropicAPIKeyPassthrough_ForwardDirect_EmptyResponseBody(t *testing.T) {

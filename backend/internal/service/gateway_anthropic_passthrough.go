@@ -136,15 +136,20 @@ func (s *GatewayService) forwardAnthropicAPIKeyPassthroughWithInput(
 				Kind:               "request_error",
 				Message:            safeErr,
 			})
-			c.JSON(http.StatusBadGateway, gin.H{
-				"type": "error",
-				"error": gin.H{
-					"type":    "upstream_error",
-					"message": "Upstream request failed",
-				},
-			})
-			MarkForwardResponseFinalized(c)
-			return nil, fmt.Errorf("upstream request failed: %s", safeErr)
+
+			// 客户端已断开：不切号、不临时封禁账号——上游根本没机会暴露真实故障。
+			if errors.Is(err, context.Canceled) {
+				return nil, err
+			}
+
+			// 传输层失败（dial tcp 不可达/连接被拒绝/DNS 失败等）：与主 Forward()
+			// 路径（dc0bf76b7）保持一致——临时封禁该账号并返回
+			// *UpstreamFailoverError，让 handler 在本次请求内切换到下一个账号。
+			tempUnscheduleUpstreamTransportError(ctx, s.rateLimitService, s.accountRepo, account.ID, safeErr, "[anthropic-passthrough]")
+			return nil, &UpstreamFailoverError{
+				StatusCode:   http.StatusBadGateway,
+				ResponseBody: []byte(`{"type":"error","error":{"type":"upstream_error","message":"Upstream request failed"}}`),
+			}
 		}
 
 		// 透传分支禁止 400 请求体降级重试（该重试会改写请求体）
