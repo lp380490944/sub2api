@@ -170,6 +170,15 @@ func (s *GatewayService) forwardBedrock(
 	}, nil
 }
 
+// bedrockDialTimeout returns the configured Bedrock connection timeout.
+// Returns 0 if not configured (caller should skip deadline).
+func (s *GatewayService) bedrockDialTimeout() time.Duration {
+	if s.cfg != nil && s.cfg.Gateway.BedrockDialTimeoutSec > 0 {
+		return time.Duration(s.cfg.Gateway.BedrockDialTimeoutSec) * time.Second
+	}
+	return 0
+}
+
 // executeBedrockUpstream 执行 Bedrock 上游请求（含重试逻辑）
 func (s *GatewayService) executeBedrockUpstream(
 	ctx context.Context,
@@ -197,7 +206,23 @@ func (s *GatewayService) executeBedrockUpstream(
 			return nil, err
 		}
 
+		// 为流式 Bedrock 请求设置更短的连接超时：死区域（TCP 不可达）在配置秒数
+		// 内直接失败而非等默认 10s dial timeout，加速 failover 到下一个区域账号。
+		// 仅用于 stream=true（响应头在连接建立后立即返回，body 读取不受此 deadline
+		// 约束）；非流式请求等待模型完整响应才拿到 headers，不能设短 deadline。
+		var dialCancel context.CancelFunc
+		if stream {
+			if dt := s.bedrockDialTimeout(); dt > 0 {
+				var dialCtx context.Context
+				dialCtx, dialCancel = context.WithTimeout(ctx, dt)
+				upstreamReq = upstreamReq.WithContext(dialCtx)
+			}
+		}
+
 		resp, err = s.httpUpstream.DoWithTLS(upstreamReq, proxyURL, account.ID, s.effectiveAccountConcurrency(ctx, account), nil)
+		if dialCancel != nil {
+			dialCancel()
+		}
 		if err != nil {
 			if resp != nil && resp.Body != nil {
 				_ = resp.Body.Close()
