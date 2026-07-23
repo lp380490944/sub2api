@@ -27,6 +27,7 @@ type RateLimitService struct {
 	tempUnschedCache      TempUnschedCache
 	timeoutCounterCache   TimeoutCounterCache
 	openAI403CounterCache OpenAI403CounterCache
+	bedrockFailureCounter BedrockFailureCounterCache
 	settingService        *SettingService
 	tokenCacheInvalidator TokenCacheInvalidator
 	runtimeBlocker        AccountRuntimeBlocker
@@ -104,6 +105,11 @@ func (s *RateLimitService) SetTimeoutCounterCache(cache TimeoutCounterCache) {
 // SetOpenAI403CounterCache 设置 OpenAI 403 连续失败计数器（可选依赖）
 func (s *RateLimitService) SetOpenAI403CounterCache(cache OpenAI403CounterCache) {
 	s.openAI403CounterCache = cache
+}
+
+// SetBedrockFailureCounterCache 设置 Bedrock 连续失败计数器(可选依赖)。
+func (s *RateLimitService) SetBedrockFailureCounterCache(cache BedrockFailureCounterCache) {
+	s.bedrockFailureCounter = cache
 }
 
 // SetSettingService 设置系统设置服务（可选依赖）
@@ -1154,6 +1160,80 @@ func (s *RateLimitService) BenchBedrockThrottle(ctx context.Context, account *Ac
 	}
 	slog.Info("bedrock_region_throttled",
 		"account_id", account.ID, "region", account.GetCredential("aws_region"), "cooldown", cooldown.String())
+}
+
+// BenchBedrockRegion 是 Bedrock 区域池的语义化冷却入口,无视 pool_mode 总是生效。
+// 依据 429 body 区分日配额(冷却到次日UTC0点)与 RPM 限流(短冷却),
+// 并累计连续失败次数,达阈值时临时不可调度。仅对 Bedrock apikey 账号生效。
+func (s *RateLimitService) BenchBedrockRegion(ctx context.Context, account *Account, headers http.Header, body []byte) {
+	if account == nil || !account.IsBedrockAPIKey() {
+		return
+	}
+	rpmDefault := 30
+	dailyEnabled := true
+	threshold := 2
+	windowSec := 300
+	failCooldownSec := 600
+	if s.cfg != nil {
+		if s.cfg.Gateway.BedrockRPMCooldownSec > 0 {
+			rpmDefault = s.cfg.Gateway.BedrockRPMCooldownSec
+		}
+		dailyEnabled = s.cfg.Gateway.BedrockDailyQuotaCooldownEnabled
+		if s.cfg.Gateway.BedrockFailureThreshold > 0 {
+			threshold = s.cfg.Gateway.BedrockFailureThreshold
+		}
+		if s.cfg.Gateway.BedrockFailureWindowSec > 0 {
+			windowSec = s.cfg.Gateway.BedrockFailureWindowSec
+		}
+		if s.cfg.Gateway.BedrockFailureCooldownSec > 0 {
+			failCooldownSec = s.cfg.Gateway.BedrockFailureCooldownSec
+		}
+	}
+
+	kind := classifyBedrock429(body)
+	resetAt := bedrockCooldownUntil(time.Now(), kind, headers, rpmDefault, dailyEnabled)
+	s.notifyAccountSchedulingBlocked(account, resetAt, "bedrock_region_cooldown")
+	if err := s.accountRepo.SetRateLimited(ctx, account.ID, resetAt); err != nil {
+		slog.Warn("bedrock_region_cooldown_set_failed", "account_id", account.ID, "error", err)
+	} else {
+		slog.Info("bedrock_region_cooldown",
+			"account_id", account.ID,
+			"region", account.GetCredential("aws_region"),
+			"kind", int(kind),
+			"reset_at", resetAt,
+			"reset_in", time.Until(resetAt).Truncate(time.Second),
+		)
+	}
+
+	// 连续失败计数(兜底,针对无法语义识别的错误)
+	if s.bedrockFailureCounter == nil {
+		return
+	}
+	count, err := s.bedrockFailureCounter.IncrementBedrockFailureCount(ctx, account.ID, windowSec)
+	if err != nil {
+		slog.Warn("bedrock_failure_count_incr_failed", "account_id", account.ID, "error", err)
+		return
+	}
+	if int(count) >= threshold {
+		until := time.Now().Add(time.Duration(failCooldownSec) * time.Second)
+		s.notifyAccountSchedulingBlocked(account, until, "bedrock_consecutive_failures")
+		if err := s.accountRepo.SetTempUnschedulable(ctx, account.ID, until, "bedrock_consecutive_failures"); err != nil {
+			slog.Warn("bedrock_temp_unsched_set_failed", "account_id", account.ID, "error", err)
+		} else {
+			slog.Warn("bedrock_consecutive_failures_temp_unsched",
+				"account_id", account.ID, "count", count, "threshold", threshold, "until", until)
+		}
+	}
+}
+
+// ResetBedrockFailure 清零 Bedrock 连续失败计数(成功响应时调用)。
+func (s *RateLimitService) ResetBedrockFailure(ctx context.Context, accountID int64) {
+	if s.bedrockFailureCounter == nil {
+		return
+	}
+	if err := s.bedrockFailureCounter.ResetBedrockFailureCount(ctx, accountID); err != nil {
+		slog.Warn("bedrock_failure_count_reset_failed", "account_id", accountID, "error", err)
+	}
 }
 
 // bedrockThrottleCooldown returns how long to bench a throttled Bedrock region: Retry-After
