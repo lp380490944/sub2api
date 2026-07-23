@@ -46,12 +46,12 @@ export default {
     close: '关闭',
     enabled: '已启用',
     disabled: '已禁用',
-	    total: '总计',
-	    balance: '余额',
-	    availableBalance: '可用余额',
-	    frozenBalance: '冻结金额',
-	    totalBalance: '总余额',
-	    available: '可用',
+    total: '总计',
+    balance: '余额',
+    availableBalance: '可用余额',
+    frozenBalance: '冻结金额',
+    totalBalance: '总余额',
+    available: '可用',
     copiedToClipboard: '已复制到剪贴板',
     copied: '已复制',
     copyFailed: '复制失败',
@@ -73,7 +73,7 @@ export default {
       title: '自动刷新',
       enable: '启用自动刷新',
       countdown: '自动刷新: {seconds}s',
-      seconds: '{n} 秒',
+      seconds: '{n} 秒'
     },
     view: '查看',
     settings: '设置',
@@ -97,9 +97,14 @@ export default {
         minutes: '{m}m',
         withSuffix: '{time} 后解除'
       }
-    }
+    },
+    apply: '应用',
+    clear: '清除',
+    creating: '创建中…',
+    required: '必填',
+    sending: '发送中…',
+    tryAgain: '请重试'
   },
-
   adminCompliance: {
     title: '部署与运营合规确认',
     blockingNotice: '继续使用控制台前，须完成部署与运营合规确认。',
@@ -116,7 +121,6 @@ export default {
     accepted: '合规确认已记录',
     acceptFailed: '提交确认失败'
   },
-
   legal: {
     loadFailed: '文档加载失败',
     retryLater: '请稍后刷新页面重试。',
@@ -144,8 +148,6 @@ export default {
       registerRequiredWarning: '请先阅读并同意最新条款后再注册。'
     }
   },
-
-  // Navigation
   nav: {
     dashboard: '仪表盘',
     announcements: '公告',
@@ -193,10 +195,8 @@ export default {
     securityAudit: '安全审计',
     contentModeration: '内容审核',
     promptAudit: '提示词审计',
-    auditLogs: '操作日志',
+    auditLogs: '操作日志'
   },
-
-  // Auth
   auth: {
     welcomeBack: '欢迎回来',
     signInToAccount: '登录您的账户以继续',
@@ -223,7 +223,7 @@ export default {
     passwordMinLength: '密码至少需要 6 个字符',
     loginFailed: '登录失败，请检查您的凭据后重试。',
     errors: {
-      USER_NOT_ACTIVE: '账号已被禁用',
+      USER_NOT_ACTIVE: '账号已被禁用'
     },
     registrationFailed: '注册失败，请重试。',
     emailSuffixNotAllowed: '该邮箱域名不在允许注册范围内。',
@@ -384,7 +384,6 @@ export default {
       state: '状态',
       fullUrl: '完整URL'
     },
-    // 忘记密码
     forgotPassword: '忘记密码？',
     forgotPasswordTitle: '重置密码',
     forgotPasswordHint: '输入您的邮箱地址，我们将向您发送密码重置链接。',
@@ -392,11 +391,9 @@ export default {
     sendingResetLink: '发送中...',
     sendResetLinkFailed: '发送重置链接失败，请重试。',
     resetEmailSent: '重置链接已发送',
-    resetEmailSentHint:
-      '如果该邮箱已注册，您将很快收到密码重置链接。请检查您的收件箱和垃圾邮件文件夹。',
+    resetEmailSentHint: '如果该邮箱已注册，您将很快收到密码重置链接。请检查您的收件箱和垃圾邮件文件夹。',
     backToLogin: '返回登录',
     rememberedPassword: '想起密码了？',
-    // 重置密码
     resetPasswordTitle: '设置新密码',
     resetPasswordHint: '请在下方输入您的新密码。',
     newPassword: '新密码',
@@ -415,15 +412,11 @@ export default {
     requestNewResetLink: '请求新的重置链接',
     invalidOrExpiredToken: '密码重置链接无效或已过期。请重新请求一个新链接。'
   },
-
-  // Step-up（敏感操作二次验证）
   stepUp: {
     title: '需要二次验证',
     hint: '请输入身份验证器应用中的 6 位验证码以继续此敏感操作。',
     verifyFailed: '验证失败，请重试',
     notEnabled: '此操作需要开启二次验证，请先在个人资料中启用 TOTP。',
     adminApiKeyForbidden: '管理 API Key 无法执行此操作，请使用已通过二次验证的管理员会话。'
-  },
-
-  // Dashboard
+  }
 }

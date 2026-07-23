@@ -3,7 +3,6 @@ export default {
     title: 'Batch Image Generation',
     description: 'Submit multiple prompts in one job and download the generated images when complete'
   },
-  // Home Page
   home: {
     viewOnGithub: 'View on GitHub',
     viewDocs: 'View Documentation',
@@ -14,7 +13,6 @@ export default {
     login: 'Login',
     getStarted: 'Get Started',
     goToDashboard: 'Go to Dashboard',
-    // User-focused value proposition
     heroSubtitle: 'One Key, All AI Models',
     heroDescription: 'No need to manage multiple subscriptions. Access Claude, GPT, Gemini and more with a single API key',
     tags: {
@@ -22,7 +20,6 @@ export default {
       stickySession: 'Session Persistence',
       realtimeBilling: 'Pay As You Go'
     },
-    // Pain points section
     painPoints: {
       title: 'Sound Familiar?',
       items: {
@@ -44,7 +41,6 @@ export default {
         }
       }
     },
-    // Solutions section
     solutions: {
       title: 'We Solve These Problems',
       subtitle: 'Three simple steps to stress-free AI access'
@@ -57,7 +53,6 @@ export default {
       balanceQuota: 'Pay What You Use',
       balanceQuotaDesc: 'Usage-based billing with quota limits. Full visibility into team consumption.'
     },
-    // Comparison section
     comparison: {
       title: 'Why Choose Us?',
       headers: {
@@ -103,7 +98,6 @@ export default {
       antigravity: 'Antigravity',
       more: 'More'
     },
-    // CTA section
     cta: {
       title: 'Ready to Get Started?',
       description: 'Sign up now and get free trial credits to experience seamless AI access',
@@ -111,10 +105,48 @@ export default {
     },
     footer: {
       allRightsReserved: 'All rights reserved.'
-    }
+    },
+    resources: {
+      compareItems: {
+        claudeCodeVsSubscription: 'Claude Code: relay vs subscription',
+        claudeVsChatgpt: 'Claude API vs ChatGPT API',
+        tokenproviderVsOfficial: 'TokenProvider vs official Claude API'
+      },
+      compareTitle: 'Comparisons',
+      examplesItems: {
+        chatgptApiCurl: 'ChatGPT API with curl',
+        claudeApiNodejs: 'Claude API in Node.js',
+        claudeApiPython: 'Claude API in Python',
+        geminiApiExample: 'Gemini API example'
+      },
+      examplesTitle: 'Code examples',
+      glossaryItems: {
+        whatIsAnAiToken: 'What is an AI token?',
+        whatIsClaudeCode: 'What is Claude Code?',
+        whatIsClaudeRelay: 'What is a Claude API relay?'
+      },
+      glossaryTitle: 'Glossary',
+      guidesItems: {
+        claudeCodeSetup: 'Claude Code setup (ANTHROPIC_BASE_URL)',
+        clineCheapClaude: 'Cline with cheap Claude API',
+        cursorClaudeProxy: 'Cursor + Claude proxy'
+      },
+      guidesTitle: 'Setup guides',
+      languageSwitchItems: {
+        chinese: '中文版（产品介绍与文档）'
+      },
+      languageSwitchTitle: 'Other languages',
+      subtitle: 'Comparisons, guides, glossary, and runnable code examples — high-density static pages indexed for search & AI citation',
+      title: 'Resources & deep dives',
+      trustItems: {
+        productHub: 'English product hub (full landing page)',
+        trust: 'Trust, logging & billing overview'
+      },
+      trustTitle: 'Trust & policies'
+    },
+    seoHeadline: 'Cheap Claude & ChatGPT API Gateway',
+    seoSubtitle: 'Pay-as-you-go tokens for Claude, Claude Code, ChatGPT, and Gemini — one unified API with transparent billing.'
   },
-
-  // Key Usage Query Page
   keyUsage: {
     title: 'API Key Usage',
     subtitle: 'Enter your API Key to view real-time spending and usage status',
@@ -134,7 +166,6 @@ export default {
     tokenStats: 'Token Statistics',
     dailyDetail: 'Daily Detail',
     modelStats: 'Model Usage Statistics',
-    // Table headers
     date: 'Date',
     model: 'Model',
     requests: 'Requests',
@@ -145,17 +176,14 @@ export default {
     cacheWriteTokens: 'Cache Write',
     totalTokens: 'Total Tokens',
     cost: 'Cost',
-    // Status
     quotaMode: 'Key Quota Mode',
     walletBalance: 'Wallet Balance',
-    // Ring card titles
     totalQuota: 'Total Quota',
     limit5h: '5-Hour Limit',
     limitDaily: 'Daily Limit',
     limit7d: '7-Day Limit',
     limitWeekly: 'Weekly Limit',
     limitMonthly: 'Monthly Limit',
-    // Detail rows
     remainingQuota: 'Remaining Quota',
     expiresAt: 'Expires At',
     todayExpires: '(expires today)',
@@ -164,7 +192,6 @@ export default {
     resetNow: 'Resetting soon',
     subscriptionType: 'Subscription Type',
     subscriptionExpires: 'Subscription Expires',
-    // Usage stat cells
     todayRequests: 'Today Requests',
     todayInputTokens: 'Today Input',
     todayOutputTokens: 'Today Output',
@@ -181,15 +208,17 @@ export default {
     totalCacheRead: 'Total Cache Read',
     totalCost: 'Total Cost',
     avgDuration: 'Avg Duration',
-    // Messages
     enterApiKey: 'Please enter an API Key',
     querySuccess: 'Query successful',
     queryFailed: 'Query failed',
     queryFailedRetry: 'Query failed, please try again later',
     noDailyUsage: 'No daily usage data',
+    cacheBenefit: 'Cache Benefit',
+    cacheNotHit: 'No Cache Hit',
+    cacheWorking: 'Cache Working',
+    todayCacheHitRate: 'Today Hit Rate',
+    totalCacheHitRate: 'Total Hit Rate'
   },
-
-  // Setup Wizard
   setup: {
     title: 'Sub2API Setup',
     description: 'Configure your Sub2API instance',
@@ -249,7 +278,5 @@ export default {
       restarting: 'Service is restarting, please wait...',
       timeout: 'Service restart is taking longer than expected. Please refresh the page manually.'
     }
-  },
-
-  // Common
+  }
 }

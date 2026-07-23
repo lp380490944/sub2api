@@ -29,7 +29,7 @@ export default {
       monthly: '月（近30天）',
       resetsAt: '{time} 重置',
       noLimit: '不限制',
-      disabled: '已禁用',
+      disabled: '已禁用'
     },
     tokenUsageTrend: 'Token 使用趋势',
     noDataAvailable: '暂无数据',
@@ -58,13 +58,9 @@ export default {
     redeemCode: '兑换码',
     addBalanceWithCode: '使用兑换码充值'
   },
-
-  // Groups (shared)
   groups: {
     subscription: '订阅'
   },
-
-  // API Keys
   keys: {
     title: 'API 密钥',
     description: '管理您的 API 密钥和访问令牌',
@@ -75,7 +71,7 @@ export default {
       copied: '已复制',
       copiedHint: '已复制到剪贴板',
       clickToCopy: '点击可复制此端点',
-      speedTest: '测速',
+      speedTest: '测速'
     },
     allGroups: '全部分组',
     allStatus: '全部状态',
@@ -135,8 +131,7 @@ export default {
       note: '这些环境变量将在当前终端会话中生效。如需永久配置，请将其添加到 ~/.bashrc、~/.zshrc 或相应的配置文件中。',
       claudeSettingsHint: '用户级持久配置。此文件包含 API 密钥，请勿提交到项目仓库。',
       noGroupTitle: '请先分配分组',
-      noGroupDescription:
-        '此 API 密钥尚未分配分组，请先在密钥列表中点击分组列进行分配，然后才能查看使用配置。',
+      noGroupDescription: '此 API 密钥尚未分配分组，请先在密钥列表中点击分组列进行分配，然后才能查看使用配置。',
       openai: {
         description: '将以下配置文件添加到 Codex CLI 配置目录中。',
         authModeTitle: 'Codex 认证模式',
@@ -146,8 +141,7 @@ export default {
         authModeApiKeyRestartNotice: '保存此配置后，必须完全退出并重启 Codex Desktop 或 CLI，然后新建 task，让客户端重新构建工具注册表。',
         configTomlHint: '请确保以下内容位于 config.toml 文件的开头部分',
         note: '请确保配置目录存在。macOS/Linux 用户可运行 mkdir -p ~/.codex 创建目录。',
-        noteWindows:
-          '按 Win+R，输入 %userprofile%\\.codex 打开配置目录。如目录不存在，请先手动创建。'
+        noteWindows: '按 Win+R，输入 %userprofile%\\.codex 打开配置目录。如目录不存在，请先手动创建。'
       },
       cliTabs: {
         claudeCode: 'Claude Code',
@@ -161,14 +155,11 @@ export default {
         description: '为 Antigravity 分组配置 API 访问。请根据您使用的客户端选择对应的配置方式。',
         claudeCode: 'Claude Code',
         geminiCli: 'Gemini CLI',
-        claudeNote:
-          '这些环境变量将在当前终端会话中生效。如需永久配置，请将其添加到 ~/.bashrc、~/.zshrc 或相应的配置文件中。',
-        geminiNote:
-          '这些环境变量将在当前终端会话中生效。如需永久配置，请将其添加到 ~/.bashrc、~/.zshrc 或相应的配置文件中。'
+        claudeNote: '这些环境变量将在当前终端会话中生效。如需永久配置，请将其添加到 ~/.bashrc、~/.zshrc 或相应的配置文件中。',
+        geminiNote: '这些环境变量将在当前终端会话中生效。如需永久配置，请将其添加到 ~/.bashrc、~/.zshrc 或相应的配置文件中。'
       },
       gemini: {
-        description:
-          '将以下环境变量添加到您的终端配置文件或直接在终端中运行，以配置 Gemini CLI 访问。',
+        description: '将以下环境变量添加到您的终端配置文件或直接在终端中运行，以配置 Gemini CLI 访问。',
         modelComment: '如果你有 Gemini 3 权限可以填：gemini-3-pro-preview',
         note: '这些环境变量将在当前终端会话中生效。如需永久配置，请将其添加到 ~/.bashrc、~/.zshrc 或相应的配置文件中。'
       },
@@ -204,8 +195,7 @@ export default {
     ipBlacklistPlaceholder: '1.2.3.4\n5.6.0.0/16',
     ipBlacklistHint: '每行一个 IP 或 CIDR，这些 IP 将被禁止使用此密钥',
     ipRestrictionEnabled: '已配置 IP 限制',
-    ccSwitchNotInstalled:
-      'CC-Switch 未安装或协议处理程序未注册。请先安装 CC-Switch 或手动复制 API 密钥。',
+    ccSwitchNotInstalled: 'CC-Switch 未安装或协议处理程序未注册。请先安装 CC-Switch 或手动复制 API 密钥。',
     ccsClientSelect: {
       title: '选择客户端',
       description: '请选择您要导入到 CC-Switch 的客户端类型：',
@@ -214,7 +204,6 @@ export default {
       geminiCli: 'Gemini CLI',
       geminiCliDesc: '导入为 Gemini CLI 配置'
     },
-    // 配额和有效期
     quotaLimit: '额度限制',
     quotaAmount: '额度金额 (USD)',
     quotaAmountPlaceholder: '输入 USD 额度限制',
@@ -254,10 +243,18 @@ export default {
       inactive: '已停用',
       quota_exhausted: '额度耗尽',
       expired: '已过期'
+    },
+    cacheStrategy: {
+      auto: '自动（推荐）',
+      autoDesc: '跟随账号 / 平台默认设置',
+      costPriority: '优先省钱',
+      costPriorityDesc: '强制 5 分钟缓存，命中率较高的短会话最划算',
+      hint: '决定此密钥请求的缓存 TTL 行为。仅在调度到 Anthropic 系账号（OAuth / Setup Token / API Key / Bedrock / Vertex）时生效，其他平台自动忽略。',
+      label: '缓存策略',
+      latencyPriority: '优先低延迟',
+      latencyPriorityDesc: '强制 1 小时缓存，长会话或频繁复用 prompt 更划算（5m → 1h 单价约高 2 倍）'
     }
   },
-
-  // Usage
   usage: {
     title: '使用记录',
     description: '查看和分析您的 API 使用历史',
@@ -385,30 +382,48 @@ export default {
       detailOrg: '运营商',
       detailTimezone: '时区',
       detailAccuracy: '定位精度',
-      detailCoordinates: '坐标',
+      detailCoordinates: '坐标'
     },
-    tabs: { usage: '用量明细', errors: '错误请求', ranking: '用户排行' },
+    tabs: {
+      usage: '用量明细',
+      errors: '错误请求',
+      ranking: '用户排行'
+    },
     errors: {
-      time: '时间', model: '模型', endpoint: '端点', status: '状态码',
-      category: '分类', platform: '平台', message: '错误信息',
-      keyName: 'Key 名称', keyDeleted: '已删除', allKeys: '全部 Key',
-      modelPlaceholder: '搜索模型', allCategories: '全部分类', allStatuses: '全部状态码',
-      empty: '暂无错误请求', failedToLoad: '加载错误请求失败',
+      time: '时间',
+      model: '模型',
+      endpoint: '端点',
+      status: '状态码',
+      category: '分类',
+      platform: '平台',
+      message: '错误信息',
+      keyName: 'Key 名称',
+      keyDeleted: '已删除',
+      allKeys: '全部 Key',
+      modelPlaceholder: '搜索模型',
+      allCategories: '全部分类',
+      allStatuses: '全部状态码',
+      empty: '暂无错误请求',
+      failedToLoad: '加载错误请求失败',
       categories: {
-        auth: '认证失败', rate_limit: '限流', quota: '余额/订阅',
-        invalid_request: '参数错误', service_unavailable: '服务暂时不可用',
-        upstream: '上游错误', internal: '平台错误', other: '其他', cyber: '安全策略',
+        auth: '认证失败',
+        rate_limit: '限流',
+        quota: '余额/订阅',
+        invalid_request: '参数错误',
+        service_unavailable: '服务暂时不可用',
+        upstream: '上游错误',
+        internal: '平台错误',
+        other: '其他',
+        cyber: '安全策略'
       },
       detail: {
         title: '错误请求详情',
         responseBody: '上游响应内容',
         upstreamStatus: '上游状态码',
-        loadFailed: '加载详情失败，请稍后重试',
-      },
-    },
+        loadFailed: '加载详情失败，请稍后重试'
+      }
+    }
   },
-
-  // Shared keys for channel monitor (admin + user views)
   monitorCommon: {
     status: {
       operational: '正常',
@@ -442,8 +457,6 @@ export default {
     relativeHoursAgo: '{n} 小时前',
     relativeDaysAgo: '{n} 天前'
   },
-
-  // Channel Status (user-facing read-only view)
   channelStatus: {
     title: '渠道状态',
     description: '查看渠道可用性、延迟和近期状态',
@@ -454,9 +467,9 @@ export default {
     detailTitle: '渠道详情',
     closeDetail: '关闭',
     windowTab: {
-      '7d': '7 天',
-      '15d': '15 天',
-      '30d': '30 天'
+      "7d": '7 天',
+      "15d": '15 天',
+      "30d": '30 天'
     },
     overall: {
       operational: 'OPERATIONAL',
@@ -485,8 +498,6 @@ export default {
       description: '管理员尚未配置可监控的渠道。'
     }
   },
-
-  // Available Channels (user-facing)
   availableChannels: {
     title: '可用渠道',
     description: '查看您可访问的渠道与其支持的模型、定价',
@@ -523,7 +534,6 @@ export default {
       unitPerRequest: '/ 次'
     }
   },
-
   affiliate: {
     title: '邀请返利',
     description: '邀请新用户注册，并将返利额度转入账户余额',
@@ -570,8 +580,6 @@ export default {
       line4: '新产生的返利需要经过冻结期后才能提现。'
     }
   },
-
-  // Redeem
   redeem: {
     title: '兑换码',
     description: '输入兑换码以充值余额或增加并发数',
@@ -613,8 +621,6 @@ export default {
     subscriptionRefreshFailed: '兑换成功，但订阅状态刷新失败。',
     pleaseEnterCode: '请输入兑换码'
   },
-
-  // Profile
   profile: {
     title: '个人设置',
     description: '管理您的账户信息和设置',
@@ -655,7 +661,6 @@ export default {
     passwordTooShort: '密码至少需要 8 个字符',
     passwordChangeSuccess: '密码修改成功',
     passwordChangeFailed: '密码修改失败',
-    // TOTP 2FA
     totp: {
       title: '双因素认证 (2FA)',
       description: '使用 Google Authenticator 等应用增强账户安全',
@@ -685,7 +690,6 @@ export default {
       loginTitle: '双因素认证',
       loginHint: '请输入您认证器应用显示的 6 位验证码',
       loginFailed: '验证失败，请重试',
-      // New translations for email verification
       verifyEmailFirst: '请先验证您的邮箱',
       verifyPasswordFirst: '请先验证您的身份',
       emailCode: '邮箱验证码',
@@ -724,7 +728,7 @@ export default {
       emailDuplicate: '该邮箱已存在',
       maxEmailsReached: '已达到通知邮箱数量上限',
       unverified: '未验证',
-      verified: '已验证',
+      verified: '已验证'
     },
     avatar: {
       title: '资料头像',
@@ -739,7 +743,7 @@ export default {
       compressTooLarge: '无法将图片压缩到 20KB 以内，请换一张更小的图片',
       compressFailed: '压缩所选图片失败',
       readFailed: '读取所选图片失败',
-      emptyDeleteHint: '当前没有可删除的头像',
+      emptyDeleteHint: '当前没有可删除的头像'
     },
     authBindings: {
       title: '登录方式绑定',
@@ -762,39 +766,33 @@ export default {
       boundCount: '已关联 {count} 条记录',
       status: {
         bound: '已绑定',
-        notBound: '未绑定',
+        notBound: '未绑定'
       },
       providers: {
         email: '邮箱',
         linuxdo: 'LinuxDo',
         dingtalk: '钉钉',
         oidc: '{providerName}',
-        wechat: '微信',
+        wechat: '微信'
       },
       notes: {
         emailManagedFromProfile: '主邮箱在资料表单中管理',
         canUnbind: '你可以解绑这个登录方式。',
-        bindAnotherBeforeUnbind: '请先绑定其他登录方式，再解除当前绑定。',
+        bindAnotherBeforeUnbind: '请先绑定其他登录方式，再解除当前绑定。'
       },
       source: {
         avatar: '头像当前来自 {providerName}',
-        username: '昵称当前来自 {providerName}',
-      },
+        username: '昵称当前来自 {providerName}'
+      }
     }
   },
-
-  // Empty States
   empty: {
     noData: '暂无数据'
   },
-
-  // Table
   table: {
     expandActions: '展开更多操作',
     collapseActions: '收起操作'
   },
-
-  // Pagination
   pagination: {
     showing: '显示',
     to: '至',
@@ -810,8 +808,6 @@ export default {
     jumpPlaceholder: '页码',
     jumpAction: '跳转'
   },
-
-  // Errors
   errors: {
     somethingWentWrong: '出错了',
     pageNotFound: '页面未找到',
@@ -822,8 +818,6 @@ export default {
     timeout: '请求超时',
     tryAgain: '请重试'
   },
-
-  // Dates
   dates: {
     today: '今天',
     yesterday: '昨天',
@@ -840,7 +834,5 @@ export default {
     endDate: '结束日期',
     apply: '应用',
     selectDateRange: '选择日期范围'
-  },
-
-  // Admin
+  }
 }
