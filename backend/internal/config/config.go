@@ -928,6 +928,13 @@ type GatewayConfig struct {
 	// 到下一个区域账号，避免默认 10s 拨号超时拖慢整条链路。默认 5 秒。
 	BedrockDialTimeoutSec int `mapstructure:"bedrock_dial_timeout_sec"`
 
+	// Bedrock 区域池智能冷却(2026-07)
+	BedrockRPMCooldownSec            int  `mapstructure:"bedrock_rpm_cooldown_sec"`             // RPM 429 无 Retry-After 时短冷却秒数
+	BedrockDailyQuotaCooldownEnabled bool `mapstructure:"bedrock_daily_quota_cooldown_enabled"` // 日配额语义识别→冷却到次日UTC0点
+	BedrockFailureThreshold          int  `mapstructure:"bedrock_failure_threshold"`            // 连续失败封禁阈值
+	BedrockFailureWindowSec          int  `mapstructure:"bedrock_failure_window_sec"`           // 连续失败计数滑动窗口
+	BedrockFailureCooldownSec        int  `mapstructure:"bedrock_failure_cooldown_sec"`         // 达阈值后的临时不可用时长
+
 	// Antigravity 429 fallback 限流时间（分钟），解析重置时间失败时使用
 	AntigravityFallbackCooldownMinutes int `mapstructure:"antigravity_fallback_cooldown_minutes"`
 
@@ -2181,6 +2188,11 @@ func setDefaults() {
 	viper.SetDefault("gateway.bedrock_fast_failover", true)
 	viper.SetDefault("gateway.bedrock_throttle_cooldown_sec", 10)
 	viper.SetDefault("gateway.bedrock_dial_timeout_sec", 5)
+	viper.SetDefault("gateway.bedrock_rpm_cooldown_sec", 30)
+	viper.SetDefault("gateway.bedrock_daily_quota_cooldown_enabled", true)
+	viper.SetDefault("gateway.bedrock_failure_threshold", 2)
+	viper.SetDefault("gateway.bedrock_failure_window_sec", 300)
+	viper.SetDefault("gateway.bedrock_failure_cooldown_sec", 600)
 	viper.SetDefault("gateway.force_codex_cli", false)
 	viper.SetDefault("gateway.codex_image_generation_bridge_enabled", false)
 	viper.SetDefault("gateway.openai_passthrough_allow_timeout_headers", false)
