@@ -922,8 +922,6 @@ type GatewayConfig struct {
 	MaxAccountSwitchesGemini int `mapstructure:"max_account_switches_gemini"`
 	// Bedrock 区域池：遇到 429/5xx/529 立即切换区域（跳过同区域的服务内重试）
 	BedrockFastFailover bool `mapstructure:"bedrock_fast_failover"`
-	// Bedrock 区域被限流(429)且无 Retry-After 时的短冷却时间(秒)
-	BedrockThrottleCooldownSec int `mapstructure:"bedrock_throttle_cooldown_sec"`
 	// Bedrock TCP 拨号+TLS 握手超时（秒）；死区域在此时间内直接失败并 failover
 	// 到下一个区域账号，避免默认 10s 拨号超时拖慢整条链路。默认 5 秒。
 	BedrockDialTimeoutSec int `mapstructure:"bedrock_dial_timeout_sec"`
@@ -2186,7 +2184,6 @@ func setDefaults() {
 	viper.SetDefault("gateway.max_account_switches", 10)
 	viper.SetDefault("gateway.max_account_switches_gemini", 3)
 	viper.SetDefault("gateway.bedrock_fast_failover", true)
-	viper.SetDefault("gateway.bedrock_throttle_cooldown_sec", 10)
 	viper.SetDefault("gateway.bedrock_dial_timeout_sec", 5)
 	viper.SetDefault("gateway.bedrock_rpm_cooldown_sec", 30)
 	viper.SetDefault("gateway.bedrock_daily_quota_cooldown_enabled", true)

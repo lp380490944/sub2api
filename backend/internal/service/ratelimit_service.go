@@ -970,6 +970,19 @@ func (s *RateLimitService) handleCustomErrorCode(ctx context.Context, account *A
 // handle429 处理429限流错误
 // 解析响应头获取重置时间，标记账号为限流状态
 func (s *RateLimitService) handle429(ctx context.Context, account *Account, headers http.Header, responseBody []byte) {
+	// Bedrock apikey 账号的 429 冷却完全由 BenchBedrockRegion 独占写入(gateway_bedrock.go 的
+	// failover hook 紧随 HandleUpstreamError 之后调用,区分日配额/RPM/连续失败做语义化冷却)。
+	// Bedrock 的 account.Platform 是 PlatformAnthropic,若不在此提前返回,由于 Bedrock 429 不带
+	// anthropic-ratelimit-unified-* 头(那是 Anthropic 官方 API 的限流头,AWS Bedrock 不会发),
+	// 下面的 per-window 解析和聚合头解析都会 miss,最终落到 "3. 尝试从响应头解析重置时间" 之后的
+	// `account.Platform == PlatformAnthropic` 兜底分支,写入一次 5s 兜底冷却——随后被
+	// BenchBedrockRegion 覆盖。这是冗余 DB 写 + 误导性的 429_fallback 日志,且正确性依赖两次调用的
+	// 先后顺序(last-write-wins),脆弱。提前返回,把 handle429 完全排除在 Bedrock apikey 账号的
+	// 冷却写入路径之外。放在最上方是安全的：上面没有任何代码(此行之前为空),下面的 shadow 检查、
+	// OpenAI/Anthropic 429 per-window 解析、Anthropic 兜底分支均与 Bedrock 无关或不适用。
+	if account.IsBedrockAPIKey() {
+		return
+	}
 	// Spark 影子：限流/熔断状态 100% 由 QueryUsage(/wham/usage body 的 codex_bengalfox)驱动。
 	// /responses 的 429 携带的 x-codex-*/usage_limit_reached 是 global codex 道(plan/spec §8),
 	// 套到影子会把 spark 误耦合到 global 窗口——即便 spark 仍有配额也会被冷却到 global reset,
@@ -1204,22 +1217,6 @@ func (s *RateLimitService) ResetBedrockFailure(ctx context.Context, accountID in
 	if err := s.bedrockFailureCounter.ResetBedrockFailureCount(ctx, accountID); err != nil {
 		slog.Warn("bedrock_failure_count_reset_failed", "account_id", accountID, "error", err)
 	}
-}
-
-// bedrockThrottleCooldown returns how long to bench a throttled Bedrock region: Retry-After
-// (delta-seconds) when present, else defaultSec. Clamped to [1, 3600] seconds.
-func bedrockThrottleCooldown(headers http.Header, defaultSec int) time.Duration {
-	sec := defaultSec
-	if ra := parseRetryAfterSeconds(headers.Get("Retry-After")); ra > 0 {
-		sec = ra
-	}
-	if sec < 1 {
-		sec = 1
-	}
-	if sec > 3600 {
-		sec = 3600
-	}
-	return time.Duration(sec) * time.Second
 }
 
 // parseRetryAfterSeconds parses a Retry-After header expressed in delta-seconds.

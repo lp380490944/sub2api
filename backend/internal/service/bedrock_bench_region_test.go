@@ -96,3 +96,30 @@ func TestBenchBedrockRegion_NonBedrockIgnored(t *testing.T) {
 		t.Fatal("非 Bedrock 账号不应被冷却")
 	}
 }
+
+// handle429 不再持有 Bedrock 分支：Bedrock apikey 账号的冷却完全由
+// BenchBedrockRegion(gateway_bedrock.go 的 failover hook)独占写入。
+// 非池模式的 Bedrock 429 若仍落到 handle429 的 Anthropic 兜底分支(因 platform
+// 是 PlatformAnthropic),会产生一次冗余的 5s 兜底冷却，随后被 BenchBedrockRegion
+// 的语义化冷却覆盖——本测试确认 handle429 对 Bedrock apikey 账号提前返回，
+// 完全不触碰 accountRepo（即 apply429FallbackRateLimit 未被调用）。
+func TestHandle429_BedrockAPIKeySkipsLocalFallback(t *testing.T) {
+	svc, repo := newBenchRegionService(nil)
+	// 非池模式：不设置 pool_mode，模拟直连/非池 Bedrock apikey 账号。
+	account := &Account{
+		ID:          121,
+		Platform:    PlatformAnthropic,
+		Type:        AccountTypeBedrock,
+		Credentials: map[string]any{"auth_mode": "apikey"},
+	}
+	// 空 headers + 无 Anthropic 限流头，模拟真实 Bedrock 429（不携带
+	// anthropic-ratelimit-unified-* 头）。若 handle429 未提前返回，会走到
+	// account.Platform == PlatformAnthropic 的兜底分支并调用 apply429FallbackRateLimit。
+	svc.handle429(context.Background(), account, http.Header{}, []byte(`{"message":"Too many requests"}`))
+	if len(repo.rateLimitedUntil) != 0 {
+		t.Fatal("handle429 不应为 Bedrock apikey 账号写入冷却(应由 BenchBedrockRegion 独占写入,handle429 需提前 return)")
+	}
+	if len(repo.tempUnschedUntil) != 0 {
+		t.Fatal("handle429 不应为 Bedrock apikey 账号写入临时不可调度状态")
+	}
+}
