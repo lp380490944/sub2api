@@ -158,6 +158,10 @@ func (s *GatewayService) forwardBedrock(
 		usage = &ClaudeUsage{}
 	}
 
+	if account.IsBedrockAPIKey() {
+		s.rateLimitService.ResetBedrockFailure(ctx, account.ID)
+	}
+
 	return &ForwardResult{
 		RequestID:        resp.Header.Get("x-amzn-requestid"),
 		Usage:            *usage,
@@ -349,6 +353,9 @@ func (s *GatewayService) handleBedrockUpstreamErrors(
 		resp.Body = io.NopCloser(bytes.NewReader(respBody))
 
 		s.handleFailoverSideEffects(ctx, resp, account)
+		if account.IsBedrockAPIKey() {
+			s.rateLimitService.BenchBedrockRegion(ctx, account, resp.Header, respBody)
+		}
 		appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
 			Platform:           account.Platform,
 			AccountID:          account.ID,

@@ -1047,13 +1047,6 @@ func (s *RateLimitService) handle429(ctx context.Context, account *Account, head
 			}
 		}
 
-		// Bedrock 区域池：AWS ThrottlingException 429 无 Anthropic 重置头。短暂冷却该区域，
-		// 否则调度器会持续重选被限流的区域。（实际路径：handleFailoverSideEffects → HandleUpstreamError → 此处）
-		if account.IsBedrockAPIKey() {
-			s.BenchBedrockThrottle(ctx, account, headers)
-			return
-		}
-
 		// Anthropic 平台：没有限流重置时间的 429 可能是非真实限流（如 Extra usage required），
 		// 不适合按 5h/7d 窗口长时间封禁；但完全不标记会导致账号永不冷却，
 		// 调度器让每个请求反复撞同一批持续 429 的账号（failover 预算被白白烧掉，
@@ -1137,29 +1130,6 @@ func (s *RateLimitService) get429FallbackCooldown(ctx context.Context, account *
 	seconds := defaultRateLimit429CooldownSeconds
 	seconds = clampRateLimit429CooldownSeconds(seconds)
 	return time.Duration(seconds) * time.Second, true
-}
-
-// BenchBedrockThrottle briefly marks a throttled Bedrock region as rate-limited so the
-// scheduler skips it until it recovers. Fixes the gap where an AWS ThrottlingException 429
-// (no Anthropic reset header) is never benched. Honors Retry-After, else the configured short
-// default (Gateway.BedrockThrottleCooldownSec). No-ops in pool_mode (which disables benching).
-func (s *RateLimitService) BenchBedrockThrottle(ctx context.Context, account *Account, headers http.Header) {
-	if account == nil || account.IsPoolMode() {
-		return
-	}
-	defaultSec := 10
-	if s.cfg != nil && s.cfg.Gateway.BedrockThrottleCooldownSec > 0 {
-		defaultSec = s.cfg.Gateway.BedrockThrottleCooldownSec
-	}
-	cooldown := bedrockThrottleCooldown(headers, defaultSec)
-	resetAt := time.Now().Add(cooldown)
-	s.notifyAccountSchedulingBlocked(account, resetAt, "bedrock_throttle")
-	if err := s.accountRepo.SetRateLimited(ctx, account.ID, resetAt); err != nil {
-		slog.Warn("rate_limit_set_failed", "account_id", account.ID, "error", err)
-		return
-	}
-	slog.Info("bedrock_region_throttled",
-		"account_id", account.ID, "region", account.GetCredential("aws_region"), "cooldown", cooldown.String())
 }
 
 // BenchBedrockRegion 是 Bedrock 区域池的语义化冷却入口,无视 pool_mode 总是生效。
