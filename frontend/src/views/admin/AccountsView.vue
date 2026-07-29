@@ -88,7 +88,6 @@
                           {{ t('admin.accounts.dataActions') }}
                         </div>
                       </div>
-                      </div>
                       <button class="account-tools-menu-item" @click="openSyncFromCrs">
                         <span class="account-tools-menu-icon bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300">
                           <Icon name="sync" size="sm" />
