@@ -35,7 +35,10 @@ vi.mock('@/api/admin', () => ({
       create: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
-      updateSortOrder: vi.fn()
+      updateSortOrder: vi.fn(),
+      // GroupsView 挂载时会调用；上游此 spec 漏了它，导致未捕获错误
+      // 泄漏并污染同批次其它用例。
+      getLiveCapability: vi.fn().mockResolvedValue({ supported: false })
     },
     accounts: {
       list: vi.fn(),

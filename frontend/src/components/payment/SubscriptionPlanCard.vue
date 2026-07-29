@@ -26,13 +26,13 @@
         </div>
         <div class="shrink-0 text-right">
           <div class="flex items-baseline gap-1">
-            <span class="text-xs text-gray-400 dark:text-dark-500">{{ symbol }}</span>
+            <span class="text-xs text-gray-400 dark:text-dark-500">{{ planCurrencySymbol }}</span>
             <span :class="['text-2xl font-extrabold tracking-tight', textClass]">{{ plan.price }}</span>
             <span v-if="plan.currency" class="text-xs font-medium text-gray-400 dark:text-dark-500">{{ plan.currency }}</span>
           </div>
           <span class="text-[11px] text-gray-400 dark:text-dark-500">/ {{ validitySuffix }}</span>
           <div v-if="plan.original_price" class="mt-0.5 flex items-center justify-end gap-1.5">
-            <span class="text-xs text-gray-400 line-through dark:text-dark-500">{{ symbol }}{{ plan.original_price }}<template v-if="plan.currency"> {{ plan.currency }}</template></span>
+            <span class="text-xs text-gray-400 line-through dark:text-dark-500">{{ planCurrencySymbol }}{{ plan.original_price }}<template v-if="plan.currency"> {{ plan.currency }}</template></span>
             <span :class="['rounded px-1 py-0.5 text-[10px] font-semibold', discountClass]">{{ discountText }}</span>
           </div>
         </div>
@@ -127,6 +127,10 @@ const emit = defineEmits<{ select: [plan: SubscriptionPlan] }>()
 const { t } = useI18n()
 
 const symbol = computed(() => currencySymbol(props.currency))
+
+// 套餐价格的符号必须跟随套餐自身币种，而不是页面展示币种：
+// 否则一个 CNY 计价的套餐会渲染成 "$10 CNY"（符号与标签自相矛盾）。
+const planCurrencySymbol = computed(() => currencySymbol(props.plan.currency || 'USD'))
 
 const platform = computed(() => props.plan.group_platform || '')
 const isRenewal = computed(() =>
