@@ -96,6 +96,16 @@ export default {
           placeholder: '例如 30',
           clearHint: '留空提交将清除所选用户的专属比例。'
         }
+      },
+      modelPlaza: {
+        title: '模型广场',
+        description: '以分组为单位向访客展示可用模型与价格的公开页面。默认关闭。',
+        enabled: '启用模型广场',
+        enabledHint: '开启后顶栏显示入口，页面可通过 /model-plaza 独立访问。',
+        requireAuth: '需要登录才可访问',
+        requireAuthHint: '开启后未登录访问将跳转登录页；关闭则公开可见，匿名访客仅展示非专属分组。',
+        priceDescription: '价格说明（Markdown）',
+        priceDescriptionHint: '展示在模型广场页面顶部，可用于说明计费规则、汇率、优惠活动等。'
       }
     },
     emailTabDisabledTitle: '邮箱验证未启用',
@@ -131,7 +141,14 @@ export default {
       sessionBinding: '会话 IP/UA 绑定',
       sessionBindingHint: '将登录会话与客户端 IP 和 User-Agent 绑定，任一变化即强制该会话失效并需重新登录（提升被盗凭证的利用门槛）。',
       auditRetention: '操作日志保留天数',
-      auditRetentionHint: '超过该天数的操作日志将被自动清理；填 0 表示永久保留（仅支持手动清空）。'
+      auditRetentionHint: '超过该天数的操作日志将被自动清理；填 0 表示永久保留（仅支持手动清空）。',
+      passkey: 'Passkey 登录',
+      passkeyHint: '当依赖方配置有效时，允许无密码登录及用户自行管理 Passkey。',
+      passkeyConfigured: 'WebAuthn 依赖方配置有效。',
+      passkeyNotConfigured: '请先配置有效的 RP ID 与允许的 HTTPS 来源，再启用 Passkey 登录。',
+      passkeyRPID: 'RP ID',
+      passkeyOrigins: '允许的 HTTPS 来源',
+      passkeyValueNotConfigured: '未配置'
     },
     turnstile: {
       title: 'Cloudflare Turnstile',
@@ -149,7 +166,14 @@ export default {
       title: 'API Key IP 访问控制',
       description: '控制 API Key 白/黑名单、操作审计日志与会话 IP/UA 绑定使用哪个客户端 IP 判断',
       trustForwardedIp: '信任反代传递的客户端 IP',
-      trustForwardedIpHint: '默认关闭。仅在源站只允许 Cloudflare 或 Nginx 反代访问时开启；开启后 API Key IP 白/黑名单、操作审计日志与会话 IP/UA 绑定会使用 CF-Connecting-IP、X-Real-IP 或 X-Forwarded-For，与使用记录中的请求 IP 保持一致。切换本开关会改变已登录会话的 IP 指纹，开启会话绑定时现有会话需重新登录。'
+      trustForwardedIpHint: '为保证升级兼容默认开启。开启后 CF-Connecting-IP、X-Real-IP 或 X-Forwarded-For 会直接接管客户端 IP 解析并覆盖 server.trusted_proxies；关闭后严格使用 server.trusted_proxies 配置的 Gin 可信代理链。仅在源站无法被直接访问时开启接管模式。切换会改变现有会话的 IP 指纹。',
+      forwardedClientIpHeaders: '自定义客户端 IP 请求头',
+      forwardedClientIpHeadersHint: '添加 CDN 或反代请求头名称，解析时优先于内置请求头。',
+      forwardedClientIpHeadersPlaceholder: 'X-Client-IP',
+      forwardedClientIpHeadersRiskHint: '源站可被直接访问时，这些原始请求头可被伪造；请先限制源站访问再信任它们。',
+      forwardedClientIpHeaderInvalid: '请输入有效的 HTTP 请求头名称。',
+      forwardedClientIpHeadersLimit: '自定义客户端 IP 请求头最多允许 {max} 个。',
+      removeForwardedClientIpHeader: '移除 {header}'
     },
     linuxdo: {
       title: 'LinuxDo Connect 登录',
@@ -649,7 +673,7 @@ export default {
       guideOpenLabel: '开通：',
       guideCallLabel: '调用：',
       guideFallbackLabel: '降级：',
-      alipayGuideSummary: '桌面优先扫码单，失败再走收银台；移动优先手机网站支付。',
+      alipayGuideSummary: '桌面优先扫码单，失败再走收银台；移动默认手机网站支付，也可启用当面付唤起。',
       alipayGuideFaceToFaceTitle: '当面付 / 扫码支付',
       alipayGuideFaceToFaceOpen: '需开通当面付或扫码支付能力。',
       alipayGuideFaceToFaceCall: '桌面端下单时优先调用 alipay.trade.precreate，前台直接渲染二维码。',
@@ -660,7 +684,7 @@ export default {
       alipayGuidePagePayFallback: '同时保留打开收银台入口，用户可手动重新拉起支付页。',
       alipayGuideWapTitle: '手机网站支付',
       alipayGuideWapOpen: '需开通手机网站支付。',
-      alipayGuideWapCall: '移动端优先调用 alipay.trade.wap.pay，跳转支付宝收银台。',
+      alipayGuideWapCall: '默认调用 alipay.trade.wap.pay；开启移动端当面付唤起后改用 alipay.trade.precreate。',
       alipayGuideWapFallback: '未开通或返回异常时，前端自动改走扫码支付并提示未开通移动支付。',
       wxpayGuideSummary: '桌面优先 Native 扫码，移动端按浏览器环境走 JSAPI 或 H5。',
       wxpayGuideNote: '当前表单默认共用一个 App ID，适合同主体下统一配置网页、移动和公众号场景。',
@@ -681,7 +705,10 @@ export default {
       supportedTypesHint: '逗号分隔，如 alipay,wxpay',
       refundEnabled: '允许退款',
       allowUserRefund: '允许用户退款',
-      enableConflict: '{method} 已有启用中的服务商实例：{provider}。请先停用现有实例后再启用或切换。'
+      enableConflict: '{method} 已有启用中的服务商实例：{provider}。请先停用现有实例后再启用或切换。',
+      alipayMobilePrecreateDeepLink: '支付宝移动端当面付唤起',
+      alipayMobilePrecreateDeepLinkHint: '启用后，移动端官方支付宝订单调用当面付并尝试打开支付宝；失败时显示动态二维码。该设置优先于强制二维码支付',
+      customMethodDisplayNamePlaceholder: '如：信用卡'
     },
     balanceNotify: {
       title: '余额不足提醒',
@@ -1177,6 +1204,46 @@ export default {
         skipSystemPromptInject: '跳过系统提示注入',
         skipSystemPromptInjectDesc: '关闭后会注入对应客户端的伪装系统提示（如 Claude Code / Kiro 必须的系统提示）；开启后用户自负责系统提示。'
       }
+    },
+    panelRateLimit: {
+      title: '面板接口限流',
+      description: '限制面板 API 的请求频率，防止高频刷接口（如用量统计、仪表盘查询）打爆数据库',
+      proxySafeNote: '登录后的接口按「用户账号」维度计数，与来源 IP 无关——反向代理、NAT 共享出口等场景不会被误拦截；公开接口按真实客户端 IP 计数，回环与内网地址（反代内部转发地址）会自动跳过。',
+      enabled: '启用面板接口限流',
+      enabledHint: '对登录后的面板接口按账号限流；超出阈值返回 429，窗口重置后自动恢复。',
+      userRpm: '每账号请求上限',
+      userRpmHint: '单个账号每分钟允许的面板 API 请求总数，正常页面操作远达不到该阈值；0 表示不限制。',
+      heavyRpm: '重查询请求上限',
+      heavyRpmHint: '单个账号每分钟允许的用量/仪表盘等聚合统计查询次数（这类请求对数据库压力最大）；0 表示不限制。',
+      publicIpRpm: '公开接口每 IP 上限',
+      publicIpRpmHint: '无需登录的公开接口（如站点公开设置）每个真实客户端 IP 每分钟的请求上限；0 表示不限制。',
+      perMinute: '次/分钟',
+      exemptAdmin: '管理员豁免',
+      exemptAdminHint: '开启后管理员账号不受面板限流约束，避免批量运维操作被误拦。',
+      saved: '面板接口限流配置已保存',
+      saveFailed: '保存面板接口限流配置失败'
+    },
+    upstreamBillingProbe: {
+      title: '上游倍率自动探测',
+      description: '定期获取 OpenAI API Key 所连接上游 Sub2API 站点声明的计费倍率。',
+      enabled: '启用全局自动探测',
+      enabledHint: '开启后，仅对账号自身已启用自动检测的账号执行定时探测；关闭后停止所有定时探测，手动探测不受影响。',
+      intervalMinutes: '探测周期（分钟）',
+      intervalHint: '范围 5–1440 分钟。成功探测结果的有效期为两个探测周期。',
+      saved: '上游倍率自动探测设置已保存',
+      saveFailed: '保存上游倍率自动探测设置失败'
+    },
+    ollamaCloudUsage: {
+      title: 'Ollama Cloud 用量刷新',
+      description: '在模型请求驱动下刷新账号在 Ollama 官方设置页展示的用量；默认关闭。无新请求时不会自动抓取。',
+      enabled: '启用全局自动刷新',
+      enabledHint: '仅刷新已保存浏览器会话且账号自身也开启自动刷新的账号；需有后续模型请求才会触发。手动刷新不受影响。',
+      intervalMinutes: '持续请求最长等待（分钟）',
+      intervalHint: '范围 15–1440 分钟。请求持续不断导致 debounce 一直后移时，最晚在此时间强制刷新。',
+      debounceMinutes: '请求安静等待（分钟）',
+      debounceHint: '范围 1–60 分钟。最后一次模型请求安静满此时长后再抓取用量。',
+      saved: 'Ollama Cloud 用量刷新设置已保存',
+      saveFailed: '保存 Ollama Cloud 用量刷新设置失败'
     }
   },
   errorPassthrough: {

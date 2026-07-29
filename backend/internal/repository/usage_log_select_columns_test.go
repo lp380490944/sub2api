@@ -13,7 +13,7 @@ import (
 //
 // If you add/remove a column, update scanUsageLog, usageLogInsertArgTypes,
 // usageLogSelectColumns, and this constant together.
-const scanUsageLogDestinationCount = 58
+const scanUsageLogDestinationCount = 59
 
 func TestUsageLogSelectColumnsMatchesScanDestinations(t *testing.T) {
 	cols := strings.Split(usageLogSelectColumns, ",")

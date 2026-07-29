@@ -316,7 +316,15 @@ export default {
       cancelled: 'Order Cancelled',
       cancelledDesc: 'You have cancelled this payment.',
       waitingPayment: 'Waiting for payment...',
-      cancelOrder: 'Cancel Order'
+      cancelOrder: 'Cancel Order',
+      alipayOpening: 'Opening Alipay',
+      alipayContinueInApp: 'Complete payment in Alipay',
+      alipayWaitingHint: 'The server will confirm the payment and update this page automatically',
+      alipayFallbackTitle: 'Alipay did not open',
+      alipayFallbackHint: 'Try opening Alipay again, or save the QR code and scan it from your Alipay photo album',
+      reopenAlipay: 'Open Alipay Again',
+      saveQRCode: 'Save QR Code',
+      alipaySaveAndScanHint: 'Save the QR code, open Alipay Scan, then select it from your photo album'
     },
     orders: {
       title: 'My Orders',
@@ -585,8 +593,11 @@ export default {
         active: 'Active',
         expired: 'Expired',
         revoked: 'Revoked'
-      }
-    }
+      },
+      validity: 'Validity',
+      validityRequired: 'Validity must be greater than 0'
+    },
+    weeks: 'weeks'
   },
   modelQuota: {
     addRule: 'Add rule',

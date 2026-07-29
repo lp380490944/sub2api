@@ -203,6 +203,7 @@ func (r *apiKeyRepository) GetByKeyForAuth(ctx context.Context, key string) (*se
 				group.FieldMcpXMLInject,
 				group.FieldSupportedModelScopes,
 				group.FieldAllowMessagesDispatch,
+				group.FieldAllowLive,
 				group.FieldDefaultMappedModel,
 				group.FieldMessagesDispatchModelConfig,
 				group.FieldModelsListConfig,
@@ -211,6 +212,8 @@ func (r *apiKeyRepository) GetByKeyForAuth(ctx context.Context, key string) (*se
 				group.FieldDefaultAccountRpm,
 				group.FieldDefaultPassthroughProfile,
 				group.FieldDefault429CooldownSec,
+				group.FieldMaxReasoningEffort,
+				group.FieldReasoningEffortMappings,
 				group.FieldPeakRateEnabled,
 				group.FieldPeakStart,
 				group.FieldPeakEnd,
@@ -227,7 +230,12 @@ func (r *apiKeyRepository) GetByKeyForAuth(ctx context.Context, key string) (*se
 	return apiKeyEntityToService(m), nil
 }
 
-func (r *apiKeyRepository) Update(ctx context.Context, key *service.APIKey) error {
+func (r *apiKeyRepository) Update(ctx context.Context, key *service.APIKey, fields service.APIKeyUpdateFields) error {
+	// 空掩码代表调用方不改任何列，直接返回，避免产生一次无意义的整行写。
+	if fields.IsEmpty() {
+		return nil
+	}
+
 	// 使用原子操作：将软删除检查与更新合并到同一语句，避免竞态条件。
 	// 之前的实现先检查 Exist 再 UpdateOneID，若在两步之间发生软删除，
 	// 则会更新已删除的记录。
@@ -237,58 +245,81 @@ func (r *apiKeyRepository) Update(ctx context.Context, key *service.APIKey) erro
 	now := time.Now()
 	builder := client.APIKey.Update().
 		Where(apikey.IDEQ(key.ID), apikey.DeletedAtIsNil()).
-		SetName(key.Name).
-		SetStatus(key.Status).
-		SetQuota(key.Quota).
-		SetQuotaUsed(key.QuotaUsed).
-		SetRateLimit5h(key.RateLimit5h).
-		SetRateLimit1d(key.RateLimit1d).
-		SetRateLimit7d(key.RateLimit7d).
-		SetUsage5h(key.Usage5h).
-		SetUsage1d(key.Usage1d).
-		SetUsage7d(key.Usage7d).
-		SetCacheStrategy(service.NormalizeCacheStrategy(key.CacheStrategy)).
 		SetUpdatedAt(now)
-	if key.GroupID != nil {
-		builder.SetGroupID(*key.GroupID)
-	} else {
-		builder.ClearGroupID()
+	if fields.Name {
+		builder.SetName(key.Name)
+	}
+	if fields.Status {
+		builder.SetStatus(key.Status)
+	}
+	if fields.Quota {
+		builder.SetQuota(key.Quota)
+	}
+	if fields.QuotaUsed {
+		builder.SetQuotaUsed(key.QuotaUsed)
+	}
+	if fields.RateLimits {
+		builder.
+			SetRateLimit5h(key.RateLimit5h).
+			SetRateLimit1d(key.RateLimit1d).
+			SetRateLimit7d(key.RateLimit7d)
+	}
+	if fields.RateLimitUsage {
+		builder.
+			SetUsage5h(key.Usage5h).
+			SetUsage1d(key.Usage1d).
+			SetUsage7d(key.Usage7d)
+
+		// Rate limit window start times
+		if key.Window5hStart != nil {
+			builder.SetWindow5hStart(*key.Window5hStart)
+		} else {
+			builder.ClearWindow5hStart()
+		}
+		if key.Window1dStart != nil {
+			builder.SetWindow1dStart(*key.Window1dStart)
+		} else {
+			builder.ClearWindow1dStart()
+		}
+		if key.Window7dStart != nil {
+			builder.SetWindow7dStart(*key.Window7dStart)
+		} else {
+			builder.ClearWindow7dStart()
+		}
+	}
+	if fields.GroupID {
+		if key.GroupID != nil {
+			builder.SetGroupID(*key.GroupID)
+		} else {
+			builder.ClearGroupID()
+		}
 	}
 
 	// Expiration time
-	if key.ExpiresAt != nil {
-		builder.SetExpiresAt(*key.ExpiresAt)
-	} else {
-		builder.ClearExpiresAt()
-	}
-
-	// Rate limit window start times
-	if key.Window5hStart != nil {
-		builder.SetWindow5hStart(*key.Window5hStart)
-	} else {
-		builder.ClearWindow5hStart()
-	}
-	if key.Window1dStart != nil {
-		builder.SetWindow1dStart(*key.Window1dStart)
-	} else {
-		builder.ClearWindow1dStart()
-	}
-	if key.Window7dStart != nil {
-		builder.SetWindow7dStart(*key.Window7dStart)
-	} else {
-		builder.ClearWindow7dStart()
+	if fields.ExpiresAt {
+		if key.ExpiresAt != nil {
+			builder.SetExpiresAt(*key.ExpiresAt)
+		} else {
+			builder.ClearExpiresAt()
+		}
 	}
 
 	// IP 限制字段
-	if len(key.IPWhitelist) > 0 {
-		builder.SetIPWhitelist(key.IPWhitelist)
-	} else {
-		builder.ClearIPWhitelist()
+	if fields.IPRules {
+		if len(key.IPWhitelist) > 0 {
+			builder.SetIPWhitelist(key.IPWhitelist)
+		} else {
+			builder.ClearIPWhitelist()
+		}
+		if len(key.IPBlacklist) > 0 {
+			builder.SetIPBlacklist(key.IPBlacklist)
+		} else {
+			builder.ClearIPBlacklist()
+		}
 	}
-	if len(key.IPBlacklist) > 0 {
-		builder.SetIPBlacklist(key.IPBlacklist)
-	} else {
-		builder.ClearIPBlacklist()
+
+	if fields.CacheStrategy {
+		builder.SetCacheStrategy(service.NormalizeCacheStrategy(key.CacheStrategy))
 	}
 
 	// 按模型 USD 配额：非空则全量替换；空/nil 则清除（=继承分组默认）
@@ -342,16 +373,14 @@ func (r *apiKeyRepository) Delete(ctx context.Context, id int64) error {
 	return nil
 }
 
-// DeleteWithAudit 在同一事务内:
-//  1. 把(明文 key、所有者、key 名称)写入 deleted_api_key_audits;
-//  2. 软删除该 key(tombstone 覆盖 key 列以释放唯一约束)。
-//
-// 保证"被删除的 key 一定能反查到所有者"。事务模式与 group_repo.DeleteCascade 一致。
+// DeleteWithAudit keeps the legacy method name for rolling-upgrade compatibility.
+// It atomically tombstones and soft-deletes the key without retaining credential
+// material. Tombstoning releases the unique key value for safe reuse.
 func (r *apiKeyRepository) DeleteWithAudit(ctx context.Context, id int64) error {
 	tombstoneKey := fmt.Sprintf("__deleted__%d__%d", id, time.Now().UnixNano())
 
 	if existingTx := dbent.TxFromContext(ctx); existingTx != nil {
-		return r.deleteWithAudit(ctx, existingTx.Client(), id, tombstoneKey)
+		return r.deleteWithTombstone(ctx, existingTx.Client(), id, tombstoneKey)
 	}
 
 	tx, err := r.client.Tx(ctx)
@@ -364,7 +393,7 @@ func (r *apiKeyRepository) DeleteWithAudit(ctx context.Context, id int64) error 
 		exec = tx.Client()
 	}
 
-	if err := r.deleteWithAudit(ctx, exec, id, tombstoneKey); err != nil {
+	if err := r.deleteWithTombstone(ctx, exec, id, tombstoneKey); err != nil {
 		return err
 	}
 
@@ -374,17 +403,7 @@ func (r *apiKeyRepository) DeleteWithAudit(ctx context.Context, id int64) error 
 	return nil
 }
 
-func (r *apiKeyRepository) deleteWithAudit(ctx context.Context, exec *dbent.Client, id int64, tombstoneKey string) error {
-	// 1. 审计:数据源即 api_keys 当前行;WHERE deleted_at IS NULL 保证只对未删除行写一次。
-	if _, err := exec.ExecContext(ctx, `
-		INSERT INTO deleted_api_key_audits (key, api_key_id, user_id, key_name, deleted_at)
-		SELECT key, id, user_id, name, NOW()
-		FROM api_keys
-		WHERE id = $1 AND deleted_at IS NULL`, id); err != nil {
-		return err
-	}
-
-	// 2. 软删除(tombstone 覆盖 key)。
+func (r *apiKeyRepository) deleteWithTombstone(ctx context.Context, exec *dbent.Client, id int64, tombstoneKey string) error {
 	res, err := exec.ExecContext(ctx, `
 		UPDATE api_keys
 		SET key = $1, deleted_at = NOW(), updated_at = NOW()
@@ -977,6 +996,7 @@ func groupEntityToService(g *dbent.Group) *service.Group {
 		SupportedModelScopes:            g.SupportedModelScopes,
 		SortOrder:                       g.SortOrder,
 		AllowMessagesDispatch:           g.AllowMessagesDispatch,
+		AllowLive:                       g.AllowLive,
 		RequireOAuthOnly:                g.RequireOauthOnly,
 		RequirePrivacySet:               g.RequirePrivacySet,
 		DefaultMappedModel:              g.DefaultMappedModel,
@@ -987,6 +1007,8 @@ func groupEntityToService(g *dbent.Group) *service.Group {
 		DefaultAccountRPM:               g.DefaultAccountRpm,
 		DefaultPassthroughProfile:       g.DefaultPassthroughProfile,
 		Default429CooldownSec:           g.Default429CooldownSec,
+		MaxReasoningEffort:              g.MaxReasoningEffort,
+		ReasoningEffortMappings:         g.ReasoningEffortMappings,
 		PeakRateEnabled:                 g.PeakRateEnabled,
 		PeakStart:                       g.PeakStart,
 		PeakEnd:                         g.PeakEnd,

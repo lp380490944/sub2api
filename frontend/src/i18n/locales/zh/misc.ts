@@ -316,7 +316,15 @@ export default {
       cancelled: '订单已取消',
       cancelledDesc: '您已取消本次支付',
       waitingPayment: '等待支付...',
-      cancelOrder: '取消订单'
+      cancelOrder: '取消订单',
+      alipayOpening: '正在打开支付宝',
+      alipayContinueInApp: '请在支付宝中完成支付',
+      alipayWaitingHint: '支付结果将由服务端确认，本页面会自动更新',
+      alipayFallbackTitle: '打开支付宝未成功',
+      alipayFallbackHint: '可重新打开支付宝，或保存下方二维码后从支付宝相册识别',
+      reopenAlipay: '重新打开支付宝',
+      saveQRCode: '保存二维码',
+      alipaySaveAndScanHint: '保存二维码后，打开支付宝扫一扫，从相册选择二维码'
     },
     orders: {
       title: '我的订单',
@@ -585,8 +593,11 @@ export default {
         active: '生效中',
         expired: '已过期',
         revoked: '已撤销'
-      }
-    }
+      },
+      validity: '有效期',
+      validityRequired: '有效期必须大于 0'
+    },
+    weeks: '周'
   },
   modelQuota: {
     addRule: '添加规则',

@@ -71,7 +71,8 @@ export default {
       runtimeConfigResetFailed: 'Failed to reset log configuration',
       cleanupConfirm: 'Clean up system logs matching the current filters? This cannot be undone.',
       cleanupSuccess: 'Cleanup complete. Deleted {count} log entries.',
-      cleanupFailed: 'Failed to clean up system logs'
+      cleanupFailed: 'Failed to clean up system logs',
+      cleanupFilterRequired: 'Cleanup requires at least one filter condition (start/end time or another field)'
     },
     requestsTotal: 'Requests (total)',
     slaScope: 'SLA scope:',
@@ -135,15 +136,15 @@ export default {
     riskyStatus: 'At Risk',
     idleStatus: 'Idle',
     timeRange: {
-      "5m": 'Last 5 minutes',
-      "30m": 'Last 30 minutes',
-      "1h": 'Last 1 hour',
-      "1d": 'Last 1 day',
-      "15d": 'Last 15 days',
-      "6h": 'Last 6 hours',
-      "24h": 'Last 24 hours',
-      "7d": 'Last 7 days',
-      "30d": 'Last 30 days',
+      '5m': 'Last 5 minutes',
+      '30m': 'Last 30 minutes',
+      '1h': 'Last 1 hour',
+      '1d': 'Last 1 day',
+      '15d': 'Last 15 days',
+      '6h': 'Last 6 hours',
+      '24h': 'Last 24 hours',
+      '7d': 'Last 7 days',
+      '30d': 'Last 30 days',
       custom: 'Custom Range'
     },
     customTimeRange: {

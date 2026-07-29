@@ -71,7 +71,8 @@ export default {
       runtimeConfigResetFailed: '重置日志配置失败',
       cleanupConfirm: '确定要清理匹配当前筛选条件的系统日志吗？此操作不可撤销。',
       cleanupSuccess: '清理完成，已删除 {count} 条日志。',
-      cleanupFailed: '清理系统日志失败'
+      cleanupFailed: '清理系统日志失败',
+      cleanupFilterRequired: '清理需要至少一个筛选条件（起止时间或其他字段）'
     },
     requestsTotal: '请求（总计）',
     slaScope: 'SLA 范围：',
@@ -135,15 +136,15 @@ export default {
     riskyStatus: '风险',
     idleStatus: '待机',
     timeRange: {
-      "5m": '近5分钟',
-      "30m": '近30分钟',
-      "1h": '近1小时',
-      "1d": '近1天',
-      "15d": '近15天',
-      "6h": '近6小时',
-      "24h": '近24小时',
-      "7d": '近7天',
-      "30d": '近30天',
+      '5m': '近5分钟',
+      '30m': '近30分钟',
+      '1h': '近1小时',
+      '1d': '近1天',
+      '15d': '近15天',
+      '6h': '近6小时',
+      '24h': '近24小时',
+      '7d': '近7天',
+      '30d': '近30天',
       custom: '自定义'
     },
     openaiTokenStats: {
