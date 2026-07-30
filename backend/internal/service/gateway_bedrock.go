@@ -128,7 +128,7 @@ func (s *GatewayService) forwardBedrock(
 
 	// 错误/failover 处理
 	if resp.StatusCode >= 400 {
-		return s.handleBedrockUpstreamErrors(ctx, resp, c, account)
+		return s.handleBedrockUpstreamErrors(ctx, resp, c, account, reqModel)
 	}
 
 	// Bedrock 分支绕过通用 Forward 成功路径，这里保持上游接受回调语义一致。
@@ -158,6 +158,10 @@ func (s *GatewayService) forwardBedrock(
 		usage = &ClaudeUsage{}
 	}
 
+	if account.IsBedrockAPIKey() {
+		s.rateLimitService.ResetBedrockFailure(ctx, account.ID)
+	}
+
 	return &ForwardResult{
 		RequestID:        resp.Header.Get("x-amzn-requestid"),
 		Usage:            *usage,
@@ -168,6 +172,15 @@ func (s *GatewayService) forwardBedrock(
 		FirstTokenMs:     firstTokenMs,
 		ClientDisconnect: clientDisconnect,
 	}, nil
+}
+
+// bedrockDialTimeout returns the configured Bedrock connection timeout.
+// Returns 0 if not configured (caller should skip deadline).
+func (s *GatewayService) bedrockDialTimeout() time.Duration {
+	if s.cfg != nil && s.cfg.Gateway.BedrockDialTimeoutSec > 0 {
+		return time.Duration(s.cfg.Gateway.BedrockDialTimeoutSec) * time.Second
+	}
+	return 0
 }
 
 // executeBedrockUpstream 执行 Bedrock 上游请求（含重试逻辑）
@@ -197,7 +210,23 @@ func (s *GatewayService) executeBedrockUpstream(
 			return nil, err
 		}
 
+		// 为流式 Bedrock 请求设置更短的连接超时：死区域（TCP 不可达）在配置秒数
+		// 内直接失败而非等默认 10s dial timeout，加速 failover 到下一个区域账号。
+		// 仅用于 stream=true（响应头在连接建立后立即返回，body 读取不受此 deadline
+		// 约束）；非流式请求等待模型完整响应才拿到 headers，不能设短 deadline。
+		var dialCancel context.CancelFunc
+		if stream {
+			if dt := s.bedrockDialTimeout(); dt > 0 {
+				var dialCtx context.Context
+				dialCtx, dialCancel = context.WithTimeout(ctx, dt)
+				upstreamReq = upstreamReq.WithContext(dialCtx)
+			}
+		}
+
 		resp, err = s.httpUpstream.DoWithTLS(upstreamReq, proxyURL, account.ID, s.effectiveAccountConcurrency(ctx, account), nil)
+		if dialCancel != nil {
+			dialCancel()
+		}
 		if err != nil {
 			if resp != nil && resp.Body != nil {
 				_ = resp.Body.Close()
@@ -213,15 +242,20 @@ func (s *GatewayService) executeBedrockUpstream(
 				Kind:               "request_error",
 				Message:            safeErr,
 			})
-			c.JSON(http.StatusBadGateway, gin.H{
-				"type": "error",
-				"error": gin.H{
-					"type":    "upstream_error",
-					"message": "Upstream request failed",
-				},
-			})
-			MarkForwardResponseFinalized(c)
-			return nil, fmt.Errorf("upstream request failed: %s", safeErr)
+
+			// 客户端已断开：不切号、不临时封禁账号——上游根本没机会暴露真实故障。
+			if errors.Is(err, context.Canceled) {
+				return nil, err
+			}
+
+			// 传输层失败（dial tcp 不可达/连接被拒绝/DNS 失败等）：与主 Forward()
+			// 路径（dc0bf76b7）保持一致——临时封禁该区域账号并返回
+			// *UpstreamFailoverError，让 handler 在本次请求内切换到其他区域账号。
+			tempUnscheduleUpstreamTransportError(ctx, s.rateLimitService, s.accountRepo, account.ID, safeErr, "[bedrock]")
+			return nil, &UpstreamFailoverError{
+				StatusCode:   http.StatusBadGateway,
+				ResponseBody: []byte(`{"type":"error","error":{"type":"upstream_error","message":"Upstream request failed"}}`),
+			}
 		}
 
 		if resp.StatusCode >= 400 && resp.StatusCode != 400 && s.shouldRetryUpstreamError(account, resp.StatusCode) &&
@@ -282,6 +316,7 @@ func (s *GatewayService) handleBedrockUpstreamErrors(
 	resp *http.Response,
 	c *gin.Context,
 	account *Account,
+	requestedModel string,
 ) (*ForwardResult, error) {
 	// retry exhausted + failover
 	if s.shouldRetryUpstreamError(account, resp.StatusCode) {
@@ -318,7 +353,10 @@ func (s *GatewayService) handleBedrockUpstreamErrors(
 		_ = resp.Body.Close()
 		resp.Body = io.NopCloser(bytes.NewReader(respBody))
 
-		s.handleFailoverSideEffects(ctx, resp, account)
+		s.handleFailoverSideEffects(ctx, resp, account, requestedModel)
+		if account.IsBedrockAPIKey() {
+			s.rateLimitService.BenchBedrockRegion(ctx, account, resp.Header, respBody)
+		}
 		appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
 			Platform:           account.Platform,
 			AccountID:          account.ID,
@@ -332,6 +370,7 @@ func (s *GatewayService) handleBedrockUpstreamErrors(
 			ResponseBody:           respBody,
 			RetryableOnSameAccount: account.IsPoolMode() && account.IsPoolModeRetryableStatus(resp.StatusCode),
 			SoftRateLimitOnExhaust: account.IsBedrockAPIKey() && resp.StatusCode == http.StatusTooManyRequests,
+			QuotaExhausted:         isBedrockModelInvalidError(resp.StatusCode, respBody),
 		}
 	}
 

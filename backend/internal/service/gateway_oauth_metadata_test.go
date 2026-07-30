@@ -80,7 +80,7 @@ func TestBuildOAuthMetadataUserID_UsesAccountUUIDWhenPresent(t *testing.T) {
 func TestBuildOAuthMetadataUserID_SessionIDStableAcrossTurns(t *testing.T) {
 	svc := &GatewayService{}
 	account := &Account{ID: 777, Type: AccountTypeOAuth, Extra: map[string]any{"account_uuid": "acc-uuid"}}
-	fp := &Fingerprint{ClientID: "clientid777", UserAgent: "claude-cli/2.1.161 (external, cli)"}
+	fp := &Fingerprint{ClientID: "clientid777", UserAgent: "claude-cli/2.1.220 (external, cli)"}
 
 	mustParse := func(body string) *ParsedRequest {
 		parsed, err := ParseGatewayRequest(NewRequestBodyRef([]byte(body)), PlatformAnthropic)

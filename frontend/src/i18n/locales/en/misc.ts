@@ -1,6 +1,4 @@
 export default {
-
-  // Subscription Progress (Header component)
   subscriptionProgress: {
     title: 'My Subscriptions',
     viewDetails: 'View subscription details',
@@ -16,8 +14,6 @@ export default {
     noSubscriptions: 'No active subscriptions',
     unlimited: 'Unlimited'
   },
-
-  // Version Badge
   version: {
     currentVersion: 'Current Version',
     latestVersion: 'Latest Version',
@@ -42,8 +38,7 @@ export default {
     rollback: 'Version Rollback',
     rollbackSelectVersion: 'Select a version to roll back to (last 3 versions)',
     rollbackConfirm: 'Roll back to {version}',
-    rollbackWarning:
-      'Rollback downloads the selected version and replaces the current binary. A service restart is required afterwards.',
+    rollbackWarning: 'Rollback downloads the selected version and replaces the current binary. A service restart is required afterwards.',
     rollingBack: 'Rolling back...',
     rollbackComplete: 'Rollback Complete',
     rollbackFailed: 'Rollback Failed',
@@ -58,8 +53,6 @@ export default {
     dockerEditCompose: 'Edit the image tag in docker-compose.yml',
     dockerRecreate: 'Recreate the container'
   },
-
-  // Recharge / Subscription Page
   purchase: {
     title: 'Recharge / Subscription',
     description: 'Recharge balance or purchase subscription via the embedded page',
@@ -67,11 +60,8 @@ export default {
     notEnabledTitle: 'Feature not enabled',
     notEnabledDesc: 'The administrator has not enabled the recharge/subscription entry. Please contact admin.',
     notConfiguredTitle: 'Recharge / Subscription URL not configured',
-    notConfiguredDesc:
-      'The administrator enabled the entry but has not configured a recharge/subscription URL. Please contact admin.'
+    notConfiguredDesc: 'The administrator enabled the entry but has not configured a recharge/subscription URL. Please contact admin.'
   },
-
-  // Custom Page (iframe embed)
   customPage: {
     title: 'Custom Page',
     openInNewTab: 'Open in new tab',
@@ -84,8 +74,6 @@ export default {
     copiedCode: 'Copied',
     copyCodeFailed: 'Failed'
   },
-
-  // Announcements Page
   announcements: {
     title: 'Announcements',
     description: 'View system announcements',
@@ -108,14 +96,11 @@ export default {
     readStatus: 'You have read this announcement',
     markReadHint: 'Click "Mark as read" to mark this announcement'
   },
-
-  // User Subscriptions Page
   userSubscriptions: {
     title: 'My Subscriptions',
     description: 'View your subscription plans and usage',
     noActiveSubscriptions: 'No Active Subscriptions',
-    noActiveSubscriptionsDesc:
-      "You don't have any active subscriptions. Contact administrator to get one.",
+    noActiveSubscriptionsDesc: "You don't have any active subscriptions. Contact administrator to get one.",
     failedToLoad: 'Failed to load subscriptions',
     status: {
       active: 'Active',
@@ -137,8 +122,6 @@ export default {
     windowNotActive: 'Awaiting first use',
     usageOf: '{used} of {limit}'
   },
-
-  // Onboarding Tour
   onboarding: {
     restartTour: 'Restart Onboarding Tour',
     dontShowAgain: "Don't show again",
@@ -150,7 +133,6 @@ export default {
       flipPage: 'Flip Page',
       exit: 'Exit'
     },
-    // Admin tour steps
     admin: {
       welcome: {
         title: '👋 Welcome to Sub2API',
@@ -250,7 +232,6 @@ export default {
         description: '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">System will generate a complete API Key after clicking create.</p><div style="padding: 8px 12px; background: #fee2e2; border-left: 3px solid #ef4444; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>⚠️ Important Reminder:</b><ul style="margin: 8px 0 0 16px;"><li>Key is only shown once, copy immediately</li><li>Need to regenerate if lost</li><li>Keep it safe, don\'t share with others</li></ul></div><div style="padding: 8px 12px; background: #f0fdf4; border-left: 3px solid #10b981; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>🚀 Next Steps:</b><ul style="margin: 8px 0 0 16px;"><li>Copy the generated sk-xxx key</li><li>Use in any OpenAI-compatible client</li><li>Start experiencing AI services!</li></ul></div><p style="margin-top: 12px; color: #10b981; font-weight: 600;">👉 Click "Create" button</p></div>'
       }
     },
-    // User tour steps
     user: {
       welcome: {
         title: '👋 Welcome to Sub2API',
@@ -282,8 +263,6 @@ export default {
       }
     }
   },
-
-  // Payment System
   payment: {
     title: 'Recharge / Subscription',
     amountLabel: 'Amount',
@@ -305,7 +284,7 @@ export default {
       card: 'Card',
       link: 'Link',
       alipay_direct: 'Alipay (Direct)',
-      wxpay_direct: 'WeChat Pay (Direct)',
+      wxpay_direct: 'WeChat Pay (Direct)'
     },
     status: {
       pending: 'Pending',
@@ -320,7 +299,7 @@ export default {
       refund_pending: 'Refund Pending',
       refunded: 'Refunded',
       partially_refunded: 'Partially Refunded',
-      refund_failed: 'Refund Failed',
+      refund_failed: 'Refund Failed'
     },
     qr: {
       scanToPay: 'Scan to Pay',
@@ -338,6 +317,14 @@ export default {
       cancelledDesc: 'You have cancelled this payment.',
       waitingPayment: 'Waiting for payment...',
       cancelOrder: 'Cancel Order',
+      alipayOpening: 'Opening Alipay',
+      alipayContinueInApp: 'Complete payment in Alipay',
+      alipayWaitingHint: 'The server will confirm the payment and update this page automatically',
+      alipayFallbackTitle: 'Alipay did not open',
+      alipayFallbackHint: 'Try opening Alipay again, or save the QR code and scan it from your Alipay photo album',
+      reopenAlipay: 'Open Alipay Again',
+      saveQRCode: 'Save QR Code',
+      alipaySaveAndScanHint: 'Save the QR code, open Alipay Scan, then select it from your photo album'
     },
     orders: {
       title: 'My Orders',
@@ -357,7 +344,7 @@ export default {
       userId: 'User ID',
       orderType: 'Order Type',
       actions: 'Actions',
-      requestRefund: 'Request Refund',
+      requestRefund: 'Request Refund'
     },
     result: {
       success: 'Payment Successful',
@@ -366,7 +353,7 @@ export default {
       processingHint: 'Payment confirmation is still pending. This page will refresh automatically.',
       failed: 'Payment Failed',
       backToRecharge: 'Back to Recharge',
-      viewOrders: 'View Orders',
+      viewOrders: 'View Orders'
     },
     currentBalance: 'Current Balance',
     groupFallback: 'Group #{id}',
@@ -406,7 +393,6 @@ export default {
       alipayDesktopQrHint: 'Desktop Alipay should render a QR code. Refresh and retry, or make sure the payment page was not blocked.',
       alipayMobileUnavailable: 'This page could not hand off to Alipay.',
       alipayMobileOpenHint: 'Allow the current page to open the Alipay app, or retry from the system browser.',
-      // Structured error codes (reason strings from backend ApplicationError)
       PAYMENT_DISABLED: 'Payment system is disabled.',
       USER_INACTIVE: 'Your account is disabled.',
       BALANCE_PAYMENT_DISABLED: 'Balance recharge has been disabled.',
@@ -434,6 +420,8 @@ export default {
       BALANCE_NOT_ENOUGH: 'Refund amount exceeds balance.',
       REFUND_AMOUNT_EXCEEDED: 'Refund amount exceeds the recharge amount.',
       REFUND_FAILED: 'Refund failed.',
+      gatewayReturnedPrefix: 'Gateway said: ',
+      genericGatewayError: 'The payment gateway could not process this order right now.'
     },
     airwallexPay: 'Airwallex Payment',
     stripePay: 'Pay Now',
@@ -442,7 +430,7 @@ export default {
       redirecting: 'Redirecting to payment page...',
       loadingQr: 'Loading WeChat Pay QR code...',
       timeout: 'Timed out waiting for payment credentials, please retry',
-      qrFailed: 'Failed to get WeChat Pay QR code',
+      qrFailed: 'Failed to get WeChat Pay QR code'
     },
     subscribeNow: 'Subscribe Now',
     renewNow: 'Renew',
@@ -456,7 +444,7 @@ export default {
       monthlyLimit: 'Monthly',
       quota: 'Quota',
       unlimited: 'Unlimited',
-      models: 'Models',
+      models: 'Models'
     },
     days: 'days',
     months: 'months',
@@ -470,7 +458,7 @@ export default {
         overview: 'Overview',
         orders: 'Orders',
         channels: 'Channels',
-        plans: 'Plans',
+        plans: 'Plans'
       },
       todayRevenue: 'Today Revenue',
       totalRevenue: 'Total Revenue',
@@ -604,9 +592,25 @@ export default {
       subsStatus: {
         active: 'Active',
         expired: 'Expired',
-        revoked: 'Revoked',
+        revoked: 'Revoked'
       },
+      validity: 'Validity',
+      validityRequired: 'Validity must be greater than 0'
     },
+    weeks: 'weeks'
   },
-
+  modelQuota: {
+    addRule: 'Add rule',
+    emptyHint: 'No rules. Click below to add a per-model USD quota limit.',
+    groupDefaultHint: 'Default per-model USD quotas inherited by all API keys in this group that have no per-key override.',
+    groupDefaultTitle: 'Group default per-model USD quota',
+    keyHint: 'Set independent 5h/1d/7d USD limits for specific models. Leave empty to inherit the group default.',
+    keyTitle: 'Per-model USD quota',
+    limit1d: '1d USD',
+    limit5h: '5h USD',
+    limit7d: '7d USD',
+    pattern: 'Model pattern',
+    patternPlaceholder: 'e.g. claude-opus-4-7 or claude-opus-*',
+    remove: 'Remove'
+  }
 }

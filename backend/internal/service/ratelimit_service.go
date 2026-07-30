@@ -27,6 +27,7 @@ type RateLimitService struct {
 	tempUnschedCache      TempUnschedCache
 	timeoutCounterCache   TimeoutCounterCache
 	openAI403CounterCache OpenAI403CounterCache
+	bedrockFailureCounter BedrockFailureCounterCache
 	settingService        *SettingService
 	tokenCacheInvalidator TokenCacheInvalidator
 	runtimeBlocker        AccountRuntimeBlocker
@@ -106,6 +107,11 @@ func (s *RateLimitService) SetOpenAI403CounterCache(cache OpenAI403CounterCache)
 	s.openAI403CounterCache = cache
 }
 
+// SetBedrockFailureCounterCache 设置 Bedrock 连续失败计数器(可选依赖)。
+func (s *RateLimitService) SetBedrockFailureCounterCache(cache BedrockFailureCounterCache) {
+	s.bedrockFailureCounter = cache
+}
+
 // SetSettingService 设置系统设置服务（可选依赖）
 func (s *RateLimitService) SetSettingService(settingService *SettingService) {
 	s.settingService = settingService
@@ -154,7 +160,8 @@ const (
 
 // CheckErrorPolicy 检查自定义错误码和临时不可调度规则。
 // 自定义错误码开启时覆盖后续所有逻辑（包括临时不可调度）。
-func (s *RateLimitService) CheckErrorPolicy(ctx context.Context, account *Account, statusCode int, responseBody []byte) ErrorPolicyResult {
+func (s *RateLimitService) CheckErrorPolicy(ctx context.Context, account *Account, statusCode int, responseBody []byte, requestedModel ...string) ErrorPolicyResult {
+	ctx = withTempUnschedulableModel(ctx, requestedModel)
 	if account.IsCustomErrorCodesEnabled() {
 		if account.ShouldHandleErrorCode(statusCode) {
 			return ErrorPolicyMatched
@@ -163,9 +170,14 @@ func (s *RateLimitService) CheckErrorPolicy(ctx context.Context, account *Accoun
 		return ErrorPolicySkipped
 	}
 	if account.IsPoolMode() {
+		// 池模式只跳过默认账号状态处理；管理员显式配置的临时不可调度规则仍应生效。
+		// 401 保留现有认证错误语义，避免改变重复 401 的升级行为。
+		if statusCode != http.StatusUnauthorized && s.tryTempUnschedulable(ctx, account, statusCode, responseBody) {
+			return ErrorPolicyTempUnscheduled
+		}
 		return ErrorPolicySkipped
 	}
-	if s.tryTempUnschedulable(ctx, account, statusCode, responseBody) {
+	if s.tryTempUnschedulable(ctx, account, statusCode, responseBody, firstRequestedModel(requestedModel)) {
 		return ErrorPolicyTempUnscheduled
 	}
 	return ErrorPolicyNone
@@ -174,10 +186,15 @@ func (s *RateLimitService) CheckErrorPolicy(ctx context.Context, account *Accoun
 // HandleUpstreamError 处理上游错误响应，标记账号状态
 // 返回是否应该停止该账号的调度
 func (s *RateLimitService) HandleUpstreamError(ctx context.Context, account *Account, statusCode int, headers http.Header, responseBody []byte, requestedModel ...string) (shouldDisable bool) {
+	ctx = withTempUnschedulableModel(ctx, requestedModel)
 	customErrorCodesEnabled := account.IsCustomErrorCodesEnabled()
 
-	// 池模式默认不标记本地账号状态；仅当用户显式配置自定义错误码时按本地策略处理。
+	// 池模式默认不标记本地账号状态；但管理员显式配置的临时不可调度规则优先。
+	// 401 保留现有认证错误语义，不在这里改变池模式的认证处理。
 	if account.IsPoolMode() && !customErrorCodesEnabled {
+		if statusCode != http.StatusUnauthorized && s.tryTempUnschedulable(ctx, account, statusCode, responseBody) {
+			return true
+		}
 		slog.Info("pool_mode_error_skipped", "account_id", account.ID, "status_code", statusCode)
 		return false
 	}
@@ -211,7 +228,7 @@ func (s *RateLimitService) HandleUpstreamError(ctx context.Context, account *Acc
 	// 先尝试临时不可调度规则（401除外）
 	// 如果匹配成功，直接返回，不执行后续禁用逻辑
 	if statusCode != 401 {
-		if s.tryTempUnschedulable(ctx, account, statusCode, responseBody) {
+		if s.tryTempUnschedulable(ctx, account, statusCode, responseBody, firstRequestedModel(requestedModel)) {
 			return true
 		}
 	}
@@ -964,6 +981,19 @@ func (s *RateLimitService) handleCustomErrorCode(ctx context.Context, account *A
 // handle429 处理429限流错误
 // 解析响应头获取重置时间，标记账号为限流状态
 func (s *RateLimitService) handle429(ctx context.Context, account *Account, headers http.Header, responseBody []byte) {
+	// Bedrock apikey 账号的 429 冷却完全由 BenchBedrockRegion 独占写入(gateway_bedrock.go 的
+	// failover hook 紧随 HandleUpstreamError 之后调用,区分日配额/RPM/连续失败做语义化冷却)。
+	// Bedrock 的 account.Platform 是 PlatformAnthropic,若不在此提前返回,由于 Bedrock 429 不带
+	// anthropic-ratelimit-unified-* 头(那是 Anthropic 官方 API 的限流头,AWS Bedrock 不会发),
+	// 下面的 per-window 解析和聚合头解析都会 miss,最终落到 "3. 尝试从响应头解析重置时间" 之后的
+	// `account.Platform == PlatformAnthropic` 兜底分支,写入一次 5s 兜底冷却——随后被
+	// BenchBedrockRegion 覆盖。这是冗余 DB 写 + 误导性的 429_fallback 日志,且正确性依赖两次调用的
+	// 先后顺序(last-write-wins),脆弱。提前返回,把 handle429 完全排除在 Bedrock apikey 账号的
+	// 冷却写入路径之外。放在最上方是安全的：上面没有任何代码(此行之前为空),下面的 shadow 检查、
+	// OpenAI/Anthropic 429 per-window 解析、Anthropic 兜底分支均与 Bedrock 无关或不适用。
+	if account.IsBedrockAPIKey() {
+		return
+	}
 	// Spark 影子：限流/熔断状态 100% 由 QueryUsage(/wham/usage body 的 codex_bengalfox)驱动。
 	// /responses 的 429 携带的 x-codex-*/usage_limit_reached 是 global codex 道(plan/spec §8),
 	// 套到影子会把 spark 误耦合到 global 窗口——即便 spark 仍有配额也会被冷却到 global reset,
@@ -1039,13 +1069,6 @@ func (s *RateLimitService) handle429(ctx context.Context, account *Account, head
 				slog.Info("account_rate_limited", "account_id", account.ID, "platform", account.Platform, "reset_at", resetTime, "reset_in", time.Until(resetTime).Truncate(time.Second))
 				return
 			}
-		}
-
-		// Bedrock 区域池：AWS ThrottlingException 429 无 Anthropic 重置头。短暂冷却该区域，
-		// 否则调度器会持续重选被限流的区域。（实际路径：handleFailoverSideEffects → HandleUpstreamError → 此处）
-		if account.IsBedrockAPIKey() {
-			s.BenchBedrockThrottle(ctx, account, headers)
-			return
 		}
 
 		// Anthropic 平台：没有限流重置时间的 429 可能是非真实限流（如 Extra usage required），
@@ -1133,43 +1156,78 @@ func (s *RateLimitService) get429FallbackCooldown(ctx context.Context, account *
 	return time.Duration(seconds) * time.Second, true
 }
 
-// BenchBedrockThrottle briefly marks a throttled Bedrock region as rate-limited so the
-// scheduler skips it until it recovers. Fixes the gap where an AWS ThrottlingException 429
-// (no Anthropic reset header) is never benched. Honors Retry-After, else the configured short
-// default (Gateway.BedrockThrottleCooldownSec). No-ops in pool_mode (which disables benching).
-func (s *RateLimitService) BenchBedrockThrottle(ctx context.Context, account *Account, headers http.Header) {
-	if account == nil || account.IsPoolMode() {
+// BenchBedrockRegion 是 Bedrock 区域池的语义化冷却入口,无视 pool_mode 总是生效。
+// 依据 429 body 区分日配额(冷却到次日UTC0点)与 RPM 限流(短冷却),
+// 并累计连续失败次数,达阈值时临时不可调度。仅对 Bedrock apikey 账号生效。
+func (s *RateLimitService) BenchBedrockRegion(ctx context.Context, account *Account, headers http.Header, body []byte) {
+	if account == nil || !account.IsBedrockAPIKey() {
 		return
 	}
-	defaultSec := 10
-	if s.cfg != nil && s.cfg.Gateway.BedrockThrottleCooldownSec > 0 {
-		defaultSec = s.cfg.Gateway.BedrockThrottleCooldownSec
+	rpmDefault := 30
+	dailyEnabled := true
+	threshold := 2
+	windowSec := 300
+	failCooldownSec := 600
+	if s.cfg != nil {
+		if s.cfg.Gateway.BedrockRPMCooldownSec > 0 {
+			rpmDefault = s.cfg.Gateway.BedrockRPMCooldownSec
+		}
+		dailyEnabled = s.cfg.Gateway.BedrockDailyQuotaCooldownEnabled
+		if s.cfg.Gateway.BedrockFailureThreshold > 0 {
+			threshold = s.cfg.Gateway.BedrockFailureThreshold
+		}
+		if s.cfg.Gateway.BedrockFailureWindowSec > 0 {
+			windowSec = s.cfg.Gateway.BedrockFailureWindowSec
+		}
+		if s.cfg.Gateway.BedrockFailureCooldownSec > 0 {
+			failCooldownSec = s.cfg.Gateway.BedrockFailureCooldownSec
+		}
 	}
-	cooldown := bedrockThrottleCooldown(headers, defaultSec)
-	resetAt := time.Now().Add(cooldown)
-	s.notifyAccountSchedulingBlocked(account, resetAt, "bedrock_throttle")
+
+	kind := classifyBedrock429(body)
+	resetAt := bedrockCooldownUntil(time.Now(), kind, headers, rpmDefault, dailyEnabled)
+	s.notifyAccountSchedulingBlocked(account, resetAt, "bedrock_region_cooldown")
 	if err := s.accountRepo.SetRateLimited(ctx, account.ID, resetAt); err != nil {
-		slog.Warn("rate_limit_set_failed", "account_id", account.ID, "error", err)
+		slog.Warn("bedrock_region_cooldown_set_failed", "account_id", account.ID, "error", err)
+	} else {
+		slog.Info("bedrock_region_cooldown",
+			"account_id", account.ID,
+			"region", account.GetCredential("aws_region"),
+			"kind", int(kind),
+			"reset_at", resetAt,
+			"reset_in", time.Until(resetAt).Truncate(time.Second),
+		)
+	}
+
+	// 连续失败计数(兜底,针对无法语义识别的错误)
+	if s.bedrockFailureCounter == nil {
 		return
 	}
-	slog.Info("bedrock_region_throttled",
-		"account_id", account.ID, "region", account.GetCredential("aws_region"), "cooldown", cooldown.String())
+	count, err := s.bedrockFailureCounter.IncrementBedrockFailureCount(ctx, account.ID, windowSec)
+	if err != nil {
+		slog.Warn("bedrock_failure_count_incr_failed", "account_id", account.ID, "error", err)
+		return
+	}
+	if int(count) >= threshold {
+		until := time.Now().Add(time.Duration(failCooldownSec) * time.Second)
+		s.notifyAccountSchedulingBlocked(account, until, "bedrock_consecutive_failures")
+		if err := s.accountRepo.SetTempUnschedulable(ctx, account.ID, until, "bedrock_consecutive_failures"); err != nil {
+			slog.Warn("bedrock_temp_unsched_set_failed", "account_id", account.ID, "error", err)
+		} else {
+			slog.Warn("bedrock_consecutive_failures_temp_unsched",
+				"account_id", account.ID, "count", count, "threshold", threshold, "until", until)
+		}
+	}
 }
 
-// bedrockThrottleCooldown returns how long to bench a throttled Bedrock region: Retry-After
-// (delta-seconds) when present, else defaultSec. Clamped to [1, 3600] seconds.
-func bedrockThrottleCooldown(headers http.Header, defaultSec int) time.Duration {
-	sec := defaultSec
-	if ra := parseRetryAfterSeconds(headers.Get("Retry-After")); ra > 0 {
-		sec = ra
+// ResetBedrockFailure 清零 Bedrock 连续失败计数(成功响应时调用)。
+func (s *RateLimitService) ResetBedrockFailure(ctx context.Context, accountID int64) {
+	if s.bedrockFailureCounter == nil {
+		return
 	}
-	if sec < 1 {
-		sec = 1
+	if err := s.bedrockFailureCounter.ResetBedrockFailureCount(ctx, accountID); err != nil {
+		slog.Warn("bedrock_failure_count_reset_failed", "account_id", accountID, "error", err)
 	}
-	if sec > 3600 {
-		sec = 3600
-	}
-	return time.Duration(sec) * time.Second
 }
 
 // parseRetryAfterSeconds parses a Retry-After header expressed in delta-seconds.
@@ -2033,14 +2091,18 @@ func (s *RateLimitService) GetTempUnschedStatus(ctx context.Context, accountID i
 	return state, nil
 }
 
-func (s *RateLimitService) HandleTempUnschedulable(ctx context.Context, account *Account, statusCode int, responseBody []byte) bool {
+func (s *RateLimitService) HandleTempUnschedulable(ctx context.Context, account *Account, statusCode int, responseBody []byte, requestedModel ...string) bool {
 	if account == nil {
+		return false
+	}
+	if account.IsPoolMode() && !account.IsCustomErrorCodesEnabled() {
 		return false
 	}
 	if !account.ShouldHandleErrorCode(statusCode) {
 		return false
 	}
-	return s.tryTempUnschedulable(ctx, account, statusCode, responseBody)
+	ctx = withTempUnschedulableModel(ctx, requestedModel)
+	return s.tryTempUnschedulable(ctx, account, statusCode, responseBody, firstRequestedModel(requestedModel))
 }
 
 func (s *RateLimitService) HandleOpenAIImageRateLimit(ctx context.Context, account *Account, statusCode int, headers http.Header, responseBody []byte) bool {
@@ -2173,6 +2235,8 @@ func (s *RateLimitService) HandleUpstreamModelNotFound(ctx context.Context, acco
 	switch {
 	case isUpstreamModelNotFoundError(statusCode, responseBody):
 		cooldown, reason = upstreamModelNotFoundCooldown, upstreamModelNotFoundReason
+	case isBedrockModelInvalidError(statusCode, responseBody):
+		cooldown, reason = upstreamModelNotFoundCooldown, "upstream_400_bedrock_model_invalid"
 	case isOpenAIOAuthAccount(account) && isOpenAICodexPlanGatedModelError(statusCode, responseBody):
 		cooldown, reason = upstreamCodexPlanGatedModelCooldown, upstreamCodexPlanGatedModelReason
 	default:
@@ -2208,7 +2272,71 @@ func modelRateLimitKeyForUpstreamModelNotFound(ctx context.Context, account *Acc
 	return modelKey
 }
 
-func (s *RateLimitService) tryTempUnschedulable(ctx context.Context, account *Account, statusCode int, responseBody []byte) bool {
+func firstRequestedModel(requestedModel []string) string {
+	if len(requestedModel) == 0 {
+		return ""
+	}
+	return strings.TrimSpace(requestedModel[0])
+}
+
+type tempUnschedulableModelContextKey struct{}
+
+func withTempUnschedulableModel(ctx context.Context, requestedModel []string) context.Context {
+	model := firstRequestedModel(requestedModel)
+	if model == "" {
+		return ctx
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return context.WithValue(ctx, tempUnschedulableModelContextKey{}, model)
+}
+
+func tempUnschedulableModel(ctx context.Context, requestedModel []string) string {
+	if model := firstRequestedModel(requestedModel); model != "" {
+		return model
+	}
+	if ctx == nil {
+		return ""
+	}
+	model, _ := ctx.Value(tempUnschedulableModelContextKey{}).(string)
+	return strings.TrimSpace(model)
+}
+
+type tempUnschedulableRuleMatch struct {
+	rule           TempUnschedulableRule
+	ruleIndex      int
+	matchedKeyword string
+}
+
+func matchTempUnschedulableRules(account *Account, statusCode int, responseBody []byte) []tempUnschedulableRuleMatch {
+	if account == nil || !account.IsTempUnschedulableEnabled() || statusCode <= 0 || len(responseBody) == 0 {
+		return nil
+	}
+	rules := account.GetTempUnschedulableRules()
+	if len(rules) == 0 {
+		return nil
+	}
+	body := responseBody
+	if len(body) > tempUnschedBodyMaxBytes {
+		body = body[:tempUnschedBodyMaxBytes]
+	}
+	bodyLower := strings.ToLower(string(body))
+	matches := make([]tempUnschedulableRuleMatch, 0, 1)
+	for idx, rule := range rules {
+		if rule.ErrorCode != statusCode || len(rule.Keywords) == 0 {
+			continue
+		}
+		matchedKeyword := matchTempUnschedKeyword(bodyLower, rule.Keywords)
+		if matchedKeyword == "" {
+			continue
+		}
+		matches = append(matches, tempUnschedulableRuleMatch{rule: rule, ruleIndex: idx, matchedKeyword: matchedKeyword})
+	}
+	return matches
+}
+
+func (s *RateLimitService) tryTempUnschedulable(ctx context.Context, account *Account, statusCode int, responseBody []byte, requestedModel ...string) bool {
 	if account == nil {
 		return false
 	}
@@ -2232,30 +2360,8 @@ func (s *RateLimitService) tryTempUnschedulable(ctx context.Context, account *Ac
 			return false
 		}
 	}
-	rules := account.GetTempUnschedulableRules()
-	if len(rules) == 0 {
-		return false
-	}
-	if statusCode <= 0 || len(responseBody) == 0 {
-		return false
-	}
-
-	body := responseBody
-	if len(body) > tempUnschedBodyMaxBytes {
-		body = body[:tempUnschedBodyMaxBytes]
-	}
-	bodyLower := strings.ToLower(string(body))
-
-	for idx, rule := range rules {
-		if rule.ErrorCode != statusCode || len(rule.Keywords) == 0 {
-			continue
-		}
-		matchedKeyword := matchTempUnschedKeyword(bodyLower, rule.Keywords)
-		if matchedKeyword == "" {
-			continue
-		}
-
-		if s.triggerTempUnschedulable(ctx, account, rule, idx, statusCode, matchedKeyword, responseBody) {
+	for _, match := range matchTempUnschedulableRules(account, statusCode, responseBody) {
+		if s.triggerTempUnschedulable(ctx, account, match.rule, match.ruleIndex, statusCode, match.matchedKeyword, responseBody, tempUnschedulableModel(ctx, requestedModel)) {
 			return true
 		}
 	}
@@ -2305,6 +2411,9 @@ func matchTempUnschedKeyword(bodyLower string, keywords []string) string {
 // baseReason, and an optional ruleIndex (pass -1 for non-rule callers).
 // Both are embedded into a TempUnschedState JSON that becomes the
 // account's temp_unschedulable_reason for auditability.
+//
+// An optional requestedModel scopes known-model failures to a per-(account,
+// model) rate limit instead of blocking the whole account (see modelKey below).
 func (s *RateLimitService) triggerTempUnschedulableWithBackoff(
 	ctx context.Context,
 	account *Account,
@@ -2313,6 +2422,7 @@ func (s *RateLimitService) triggerTempUnschedulableWithBackoff(
 	baseReason string,
 	responseBody []byte,
 	ruleIndex int,
+	requestedModel ...string,
 ) bool {
 	if account == nil {
 		return false
@@ -2344,6 +2454,21 @@ func (s *RateLimitService) triggerTempUnschedulableWithBackoff(
 	}
 	if reason == "" {
 		reason = baseReason
+	}
+
+	// Persist known-model failures under the model key so the scheduler excludes
+	// only this (account, model) pair. Authentication and model-unknown failures
+	// retain the legacy account-wide temporary-unschedulable behavior below.
+	modelKey := firstRequestedModel(requestedModel)
+	if modelKey != "" && statusCode != http.StatusUnauthorized {
+		if err := s.accountRepo.SetModelRateLimit(ctx, account.ID, modelKey, until, reason); err != nil {
+			slog.Warn("temp_unsched_model_rate_limit_set_failed", "account_id", account.ID, "model", modelKey, "error", err)
+			// The rule matched, so fail over the current request even if persistence
+			// failed; never widen a model-scoped failure into an account-wide block.
+			return true
+		}
+		slog.Info("account_model_temp_unschedulable", "account_id", account.ID, "model", modelKey, "until", until, "rule_index", ruleIndex, "status_code", statusCode)
+		return true
 	}
 
 	s.notifyAccountSchedulingBlocked(account, until, "temp_unschedulable")
@@ -2380,7 +2505,7 @@ func (s *RateLimitService) TriggerThinkingSignatureUnsched(ctx context.Context, 
 		"thinking signature", "thinking signature retry exhausted", respBody, -1)
 }
 
-func (s *RateLimitService) triggerTempUnschedulable(ctx context.Context, account *Account, rule TempUnschedulableRule, ruleIndex int, statusCode int, matchedKeyword string, responseBody []byte) bool {
+func (s *RateLimitService) triggerTempUnschedulable(ctx context.Context, account *Account, rule TempUnschedulableRule, ruleIndex int, statusCode int, matchedKeyword string, responseBody []byte, requestedModel ...string) bool {
 	if account == nil {
 		return false
 	}
@@ -2391,7 +2516,7 @@ func (s *RateLimitService) triggerTempUnschedulable(ctx context.Context, account
 	if baseReason == "" {
 		baseReason = fmt.Sprintf("rule #%d matched (status=%d keyword=%q)", ruleIndex, statusCode, matchedKeyword)
 	}
-	return s.triggerTempUnschedulableWithBackoff(ctx, account, statusCode, matchedKeyword, baseReason, responseBody, ruleIndex)
+	return s.triggerTempUnschedulableWithBackoff(ctx, account, statusCode, matchedKeyword, baseReason, responseBody, ruleIndex, requestedModel...)
 }
 
 func truncateTempUnschedMessage(body []byte, maxBytes int) string {

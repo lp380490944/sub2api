@@ -44,14 +44,17 @@ export default {
     inactive: 'Inactive',
     more: 'More',
     close: 'Close',
+    toggleMenu: 'Toggle menu',
+    userMenu: 'User menu',
+    pageNotFound: 'Page not found',
     enabled: 'Enabled',
     disabled: 'Disabled',
-	    total: 'Total',
-	    balance: 'Balance',
-	    availableBalance: 'Available balance',
-	    frozenBalance: 'Frozen balance',
-	    totalBalance: 'Total balance',
-	    available: 'Available',
+    total: 'Total',
+    balance: 'Balance',
+    availableBalance: 'Available balance',
+    frozenBalance: 'Frozen balance',
+    totalBalance: 'Total balance',
+    available: 'Available',
     copiedToClipboard: 'Copied to clipboard',
     copied: 'Copied',
     copyFailed: 'Failed to copy',
@@ -73,7 +76,7 @@ export default {
       title: 'Auto Refresh',
       enable: 'Enable auto refresh',
       countdown: 'Auto refresh: {seconds}s',
-      seconds: '{n} seconds',
+      seconds: '{n} seconds'
     },
     view: 'View',
     settings: 'Settings',
@@ -97,9 +100,14 @@ export default {
         minutes: '{m}m',
         withSuffix: '{time} to lift'
       }
-    }
+    },
+    apply: 'Apply',
+    clear: 'Clear',
+    creating: 'Creating…',
+    required: 'Required',
+    sending: 'Sending…',
+    tryAgain: 'Please try again'
   },
-
   adminCompliance: {
     title: 'Deployment and Operation Compliance Acknowledgment',
     blockingNotice: 'Deployment and operation compliance acknowledgment is required before continuing to use the console.',
@@ -116,7 +124,6 @@ export default {
     accepted: 'Compliance acknowledgment recorded',
     acceptFailed: 'Failed to submit acknowledgment'
   },
-
   legal: {
     loadFailed: 'Failed to load document',
     retryLater: 'Refresh the page and try again later.',
@@ -144,8 +151,6 @@ export default {
       registerRequiredWarning: 'Please read and accept the latest terms before registering.'
     }
   },
-
-  // Navigation
   nav: {
     dashboard: 'Dashboard',
     announcements: 'Announcements',
@@ -163,6 +168,7 @@ export default {
     groups: 'Groups',
     channels: 'Channels',
     availableChannels: 'Available Channels',
+    modelPlaza: 'Model Plaza',
     subscriptions: 'Subscriptions',
     accounts: 'Accounts',
     proxies: 'Proxies',
@@ -193,15 +199,17 @@ export default {
     securityAudit: 'Security Audit',
     contentModeration: 'Content Moderation',
     promptAudit: 'Prompt Audit',
-    auditLogs: 'Audit Logs',
+    auditLogs: 'Audit Logs'
   },
-
-  // Auth
   auth: {
     welcomeBack: 'Welcome Back',
     signInToAccount: 'Sign in to your account to continue',
     signIn: 'Sign In',
     signingIn: 'Signing in...',
+    passkeySignIn: 'Sign in with a passkey',
+    passkeySigningIn: 'Waiting for passkey...',
+    passkeyCancelled: 'Passkey sign-in was cancelled.',
+    passkeyFailed: 'Passkey sign-in failed. Please try again.',
     createAccount: 'Create Account',
     signUpToStart: 'Sign up to start using {siteName}',
     signUp: 'Sign up',
@@ -223,12 +231,11 @@ export default {
     passwordMinLength: 'Password must be at least 6 characters',
     loginFailed: 'Login failed. Please check your credentials and try again.',
     errors: {
-      USER_NOT_ACTIVE: 'Account has been disabled.',
+      USER_NOT_ACTIVE: 'Account has been disabled.'
     },
     registrationFailed: 'Registration failed. Please try again.',
     emailSuffixNotAllowed: 'This email domain is not allowed for registration.',
-    emailSuffixNotAllowedWithAllowed:
-      'This email domain is not allowed. Allowed domains: {suffixes}',
+    emailSuffixNotAllowedWithAllowed: 'This email domain is not allowed. Allowed domains: {suffixes}',
     emailSuffixAllowedMore: 'and {count} more',
     loginSuccess: 'Login successful! Welcome back.',
     accountCreatedSuccess: 'Account created successfully! Welcome to {siteName}.',
@@ -326,8 +333,7 @@ export default {
       callbackHint: 'If you are not redirected automatically, go back to the login page and try again.',
       callbackMissingToken: 'Missing login token, please try again.',
       backToLogin: 'Back to Login',
-      invitationRequired:
-        'This {providerName} account is not yet registered. The site requires an invitation code — please enter one to complete registration.',
+      invitationRequired: 'This {providerName} account is not yet registered. The site requires an invitation code — please enter one to complete registration.',
       invalidPendingToken: 'The registration token has expired. Please sign in again.',
       completeRegistration: 'Complete Registration',
       completing: 'Completing registration…',
@@ -386,7 +392,6 @@ export default {
       state: 'State',
       fullUrl: 'Full URL'
     },
-    // Forgot password
     forgotPassword: 'Forgot password?',
     forgotPasswordTitle: 'Reset Your Password',
     forgotPasswordHint: 'Enter your email address and we will send you a link to reset your password.',
@@ -397,7 +402,6 @@ export default {
     resetEmailSentHint: 'If an account exists with this email, you will receive a password reset link shortly. Please check your inbox and spam folder.',
     backToLogin: 'Back to Login',
     rememberedPassword: 'Remembered your password?',
-    // Reset password
     resetPasswordTitle: 'Set New Password',
     resetPasswordHint: 'Enter your new password below.',
     newPassword: 'New Password',
@@ -416,15 +420,11 @@ export default {
     requestNewResetLink: 'Request New Reset Link',
     invalidOrExpiredToken: 'The password reset link is invalid or has expired. Please request a new one.'
   },
-
-  // Step-up (sudo) 2FA prompt
   stepUp: {
     title: 'Two-Factor Verification Required',
     hint: 'Enter the 6-digit code from your authenticator app to continue this sensitive operation.',
     verifyFailed: 'Verification failed, please try again',
     notEnabled: 'This operation requires two-factor authentication. Please enable TOTP in your profile first.',
     adminApiKeyForbidden: 'Admin API keys cannot perform this operation. Use a two-factor verified admin session.'
-  },
-
-  // Dashboard
+  }
 }

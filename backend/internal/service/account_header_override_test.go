@@ -131,7 +131,7 @@ func TestApplyHeaderOverrides(t *testing.T) {
 
 	h := http.Header{}
 	// 模拟转发链路：canonical key 与 wire casing 原样 key 混合存在
-	h.Set("User-Agent", "claude-cli/2.1.161 (external, cli)")
+	h.Set("User-Agent", "claude-cli/2.1.220 (external, cli)")
 	h["anthropic-beta"] = []string{"claude-code-20250219,oauth-2025-04-20"} // 非 canonical 原样 key
 	h.Set("Content-Type", "application/json")
 

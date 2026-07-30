@@ -846,6 +846,10 @@ const transportErrorCooldown = 1 * time.Minute
 // 账号）触发临时封禁，避免账号无限期保持 IsSchedulable()==true，被轮询调度或粘性
 // 会话反复命中同一个死账号。
 func tempUnscheduleUpstreamTransportError(ctx context.Context, rateLimit *RateLimitService, repo AccountRepository, accountID int64, errMsg string, logPrefix string) {
+	if repo == nil {
+		log.Printf("%s temp_unschedule_skipped account=%d reason=nil_account_repo", logPrefix, accountID)
+		return
+	}
 	if rateLimit == nil {
 		// Fallback：老调用路径未接入 rateLimit 时，退化为固定 1 分钟封禁。
 		until := time.Now().Add(transportErrorCooldown)

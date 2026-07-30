@@ -96,6 +96,10 @@ func (u *grokQuotaHandlerUpstream) DoWithTLS(
 	return u.Do(req, proxyURL, accountID, accountConcurrency)
 }
 
+func (u *grokQuotaHandlerUpstream) Prewarm(_ context.Context, _ string, _ string, _ int64, _ int, _ *tlsfingerprint.Profile) error {
+	return nil
+}
+
 func TestGrokOAuthHandlerQueryQuotaProbesUpstream(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -136,8 +140,12 @@ func TestGrokOAuthHandlerQueryQuotaProbesUpstream(t *testing.T) {
 	for i, upstreamReq := range requests {
 		require.Equal(t, "Bearer access-token", upstreamReq.Header.Get("Authorization"))
 		if upstreamReq.URL.String() == xai.DefaultCLIBaseURL+"/responses" {
+			require.Equal(t, "application/json, text/event-stream", upstreamReq.Header.Get("Accept"))
 			require.Contains(t, string(bodies[i]), `"model":"grok-4.5"`)
-			require.Contains(t, string(bodies[i]), `"store":false`)
+			require.Contains(t, string(bodies[i]), `"input":"hi"`)
+			require.Contains(t, string(bodies[i]), `"stream":true`)
+			require.NotContains(t, string(bodies[i]), `"max_output_tokens"`)
+			require.NotContains(t, string(bodies[i]), `"store"`)
 		}
 	}
 	require.NotNil(t, repo.updates[42])

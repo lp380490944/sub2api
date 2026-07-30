@@ -135,7 +135,7 @@ const DefaultCacheControlTTL = "5m"
 // **源码不变量**：CLIDefaultVersion 必须与 DefaultHeaders["User-Agent"] 中的版本号严格
 // 一致；不一致 init() 直接 panic。升级流程：在同一个 PR 里修改下面两处常量，并跑一次
 // `go test ./internal/pkg/claude/...`。
-const CLIDefaultVersion = "2.1.161"
+const CLIDefaultVersion = "2.1.220"
 
 // CLICurrentVersion Deprecated：保留以兼容老调用方；返回当前运行时版本。
 // 新代码请使用 GetCLICurrentVersion()。
@@ -233,7 +233,7 @@ func FullClaudeCodeMimicryBetas() []string {
 //     SDK emits this header on every request. Omitting it is a third-party
 //     tell. (Wire casing is all-lowercase; see service.resolveWireCasing.)
 var DefaultHeaders = map[string]string{
-	"User-Agent":                  "claude-cli/2.1.161 (external, cli)",
+	"User-Agent":                  "claude-cli/2.1.220 (external, cli)",
 	"X-Stainless-Lang":            "js",
 	"X-Stainless-Package-Version": "0.94.0",
 	"X-Stainless-OS":              "Linux",
@@ -285,6 +285,12 @@ var DefaultModels = []Model{
 		Type:        "model",
 		DisplayName: "Claude Opus 4.8",
 		CreatedAt:   "2026-05-29T00:00:00Z",
+	},
+	{
+		ID:          "claude-opus-5",
+		Type:        "model",
+		DisplayName: "Claude Opus 5",
+		CreatedAt:   "2026-07-25T00:00:00Z",
 	},
 	{
 		ID:          "claude-sonnet-5",

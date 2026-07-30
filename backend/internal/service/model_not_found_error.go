@@ -46,6 +46,23 @@ func isOpenAICodexPlanGatedModelError(statusCode int, body []byte) bool {
 	return strings.Contains(normalized, openAICodexPlanGatedModelPhrase)
 }
 
+const bedrockModelInvalidPhrase = "model identifier is invalid"
+
+// isBedrockModelInvalidError matches the AWS Bedrock 400 returned when
+// a region does not support the requested model, e.g.
+// {"message":"The provided model identifier is invalid."}
+// This is a permanent condition for that (region, model) pair — not transient.
+func isBedrockModelInvalidError(statusCode int, body []byte) bool {
+	if statusCode != http.StatusBadRequest {
+		return false
+	}
+	normalized := normalizeModelNotFoundBody(body)
+	if normalized == "" {
+		return false
+	}
+	return strings.Contains(normalized, bedrockModelInvalidPhrase)
+}
+
 func containsModelNotFoundKeyword(normalizedBody string) bool {
 	if normalizedBody == "" {
 		return false
