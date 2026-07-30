@@ -2235,6 +2235,8 @@ func (s *RateLimitService) HandleUpstreamModelNotFound(ctx context.Context, acco
 	switch {
 	case isUpstreamModelNotFoundError(statusCode, responseBody):
 		cooldown, reason = upstreamModelNotFoundCooldown, upstreamModelNotFoundReason
+	case isBedrockModelInvalidError(statusCode, responseBody):
+		cooldown, reason = upstreamModelNotFoundCooldown, "upstream_400_bedrock_model_invalid"
 	case isOpenAIOAuthAccount(account) && isOpenAICodexPlanGatedModelError(statusCode, responseBody):
 		cooldown, reason = upstreamCodexPlanGatedModelCooldown, upstreamCodexPlanGatedModelReason
 	default:

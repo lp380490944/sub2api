@@ -128,7 +128,7 @@ func (s *GatewayService) forwardBedrock(
 
 	// 错误/failover 处理
 	if resp.StatusCode >= 400 {
-		return s.handleBedrockUpstreamErrors(ctx, resp, c, account)
+		return s.handleBedrockUpstreamErrors(ctx, resp, c, account, reqModel)
 	}
 
 	// Bedrock 分支绕过通用 Forward 成功路径，这里保持上游接受回调语义一致。
@@ -316,6 +316,7 @@ func (s *GatewayService) handleBedrockUpstreamErrors(
 	resp *http.Response,
 	c *gin.Context,
 	account *Account,
+	requestedModel string,
 ) (*ForwardResult, error) {
 	// retry exhausted + failover
 	if s.shouldRetryUpstreamError(account, resp.StatusCode) {
@@ -352,7 +353,7 @@ func (s *GatewayService) handleBedrockUpstreamErrors(
 		_ = resp.Body.Close()
 		resp.Body = io.NopCloser(bytes.NewReader(respBody))
 
-		s.handleFailoverSideEffects(ctx, resp, account)
+		s.handleFailoverSideEffects(ctx, resp, account, requestedModel)
 		if account.IsBedrockAPIKey() {
 			s.rateLimitService.BenchBedrockRegion(ctx, account, resp.Header, respBody)
 		}
