@@ -370,6 +370,7 @@ func (s *GatewayService) handleBedrockUpstreamErrors(
 			ResponseBody:           respBody,
 			RetryableOnSameAccount: account.IsPoolMode() && account.IsPoolModeRetryableStatus(resp.StatusCode),
 			SoftRateLimitOnExhaust: account.IsBedrockAPIKey() && resp.StatusCode == http.StatusTooManyRequests,
+			QuotaExhausted:         isBedrockModelInvalidError(resp.StatusCode, respBody),
 		}
 	}
 
