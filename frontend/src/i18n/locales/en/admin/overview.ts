@@ -469,6 +469,7 @@ export default {
     allStatuses: 'All Status',
     admin: 'Admin',
     user: 'User',
+    readonlyAdmin: 'Readonly Admin',
     disabled: 'Disabled',
     email: 'Email',
     password: 'Password',
@@ -653,7 +654,8 @@ export default {
     totalRecharged: 'Total Recharged',
     roles: {
       admin: 'Admin',
-      user: 'User'
+      user: 'User',
+      readonly_admin: 'Readonly Admin'
     },
     filterSettings: 'Filter Settings',
     columnSettings: 'Column Settings',

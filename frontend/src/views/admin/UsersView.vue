@@ -29,6 +29,7 @@
                 :options="[
                   { value: '', label: t('admin.users.allRoles') },
                   { value: 'admin', label: t('admin.users.admin') },
+                  { value: 'readonly_admin', label: t('admin.users.readonlyAdmin') },
                   { value: 'user', label: t('admin.users.user') }
                 ]"
                 @change="applyFilter"

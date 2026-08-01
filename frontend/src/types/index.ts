@@ -1921,7 +1921,7 @@ export interface UpdateUserRequest {
   password?: string
   username?: string
   notes?: string
-  role?: 'admin' | 'user'
+  role?: 'admin' | 'user' | 'readonly_admin'
   balance?: number
   concurrency?: number
   rpm_limit?: number

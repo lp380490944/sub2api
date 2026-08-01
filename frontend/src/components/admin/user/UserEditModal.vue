@@ -34,6 +34,7 @@
         <select v-model="form.role" class="input">
           <option value="user">{{ t('admin.users.roles.user') }}</option>
           <option value="admin">{{ t('admin.users.roles.admin') }}</option>
+          <option value="readonly_admin">{{ t('admin.users.roles.readonly_admin') }}</option>
         </select>
       </div>
       <div>
