@@ -26,10 +26,11 @@ package dto
 // only applied by the account handler for service.RoleReadonlyAdmin callers.
 var readonlyAdminExtraAllowlist = map[string]struct{}{
 	// ---- Passthrough / protocol routing toggles ----
-	// upstream_passthrough is a closed schema (profile/category_override are
-	// validated enums, overrides is a fixed set of named booleans,
-	// bedrock_backed_relay is a bool) with no free-text sub-field, so the
-	// whole subtree is allowed rather than enumerating sub-keys again here.
+	// upstream_passthrough's value is filtered separately by
+	// redactUpstreamPassthroughForReadonlyAdmin (only the four known sub-keys
+	// survive: profile/category_override/overrides/bedrock_backed_relay).
+	// It stays in this table so the top-level key is admitted into the loop
+	// in RedactExtraForReadonlyAdmin at all.
 	"upstream_passthrough":         {},
 	"anthropic_passthrough":        {},
 	"anthropic_apikey_auth_scheme": {},
@@ -52,9 +53,13 @@ var readonlyAdminExtraAllowlist = map[string]struct{}{
 	"openai_compact_checked_at":  {},
 	"openai_compact_last_status": {},
 
+	// codex_cli_only_allowed_clients is deliberately NOT here: it appears
+	// nowhere in the backend (no reader), is a deprecated operator-typed
+	// string list actively deleted by the frontend on save
+	// (EditAccountModal.vue, CreateAccountModal.vue), and has no established
+	// meaning worth trusting. "When in doubt, deny."
 	"codex_cli_only":                              {},
 	"codex_cli_only_allow_app_server":             {},
-	"codex_cli_only_allowed_clients":              {},
 	"codex_image_generation_bridge":               {},
 	"codex_image_generation_bridge_enabled":       {},
 	"codex_image_generation_explicit_tool_policy": {},
@@ -124,9 +129,13 @@ var readonlyAdminExtraAllowlist = map[string]struct{}{
 	"quota_notify_total_threshold":       {},
 	"quota_notify_total_threshold_type":  {},
 
-	"privacy_mode":       {},
-	"subscription_tier":  {},
-	"entitlement_status": {},
+	// subscription_tier and entitlement_status were removed from this table:
+	// they are Credentials keys (written via creds[...] in
+	// grok_oauth_service.go, read via account.GetCredential(...) in
+	// grok_quota_fetcher.go), not Extra keys. They never appear in Extra, so
+	// a row here would be dead. Credentials redaction is RedactCredentials'
+	// job, not this table's.
+	"privacy_mode": {},
 
 	"antigravity_credits_overages": {},
 	"drive_storage_limit":          {},
@@ -161,6 +170,46 @@ var readonlyAdminExtraAllowlist = map[string]struct{}{
 	"upstream_billing_probe_enabled": {},
 }
 
+// upstreamPassthroughExtraKey mirrors the unexported
+// service.upstreamPassthroughExtraKey constant (account_upstream_passthrough.go).
+// Duplicated here as a literal (matching this file's existing style of
+// literal key names) since the service constant isn't exported.
+const upstreamPassthroughExtraKey = "upstream_passthrough"
+
+// upstreamPassthroughReadonlyAdminSubKeys is the closed, four-name schema of
+// extra.upstream_passthrough (see account_upstream_passthrough.go): profile
+// and category_override are validated enums, overrides is a fixed set of
+// named booleans, bedrock_backed_relay is a bool. Enumerating them here
+// (rather than allowing the whole subtree) means a malformed/manual write
+// that stuffs an unexpected sub-key into this object can never leak through
+// this path, closing the residual risk noted in the original task-6b report.
+var upstreamPassthroughReadonlyAdminSubKeys = map[string]struct{}{
+	"profile":              {},
+	"category_override":    {},
+	"overrides":            {},
+	"bedrock_backed_relay": {},
+}
+
+// redactUpstreamPassthroughForReadonlyAdmin filters extra.upstream_passthrough
+// down to its known sub-keys. Returns nil (key omitted entirely) if the
+// stored value isn't a map[string]any or has no recognized sub-key.
+func redactUpstreamPassthroughForReadonlyAdmin(value any) any {
+	m, ok := value.(map[string]any)
+	if !ok {
+		return nil
+	}
+	filtered := make(map[string]any, len(upstreamPassthroughReadonlyAdminSubKeys))
+	for key, v := range m {
+		if _, ok := upstreamPassthroughReadonlyAdminSubKeys[key]; ok {
+			filtered[key] = v
+		}
+	}
+	if len(filtered) == 0 {
+		return nil
+	}
+	return filtered
+}
+
 // RedactExtraForReadonlyAdmin filters an Account.Extra map down to the
 // readonly_admin-safe allowlist above. Callers apply this only for
 // service.RoleReadonlyAdmin; service.RoleAdmin must keep seeing Extra
@@ -175,9 +224,44 @@ func RedactExtraForReadonlyAdmin(extra map[string]any) map[string]any {
 	}
 	redacted := make(map[string]any, len(extra))
 	for key, value := range extra {
-		if _, ok := readonlyAdminExtraAllowlist[key]; ok {
-			redacted[key] = value
+		if _, ok := readonlyAdminExtraAllowlist[key]; !ok {
+			continue
 		}
+		if key == upstreamPassthroughExtraKey {
+			if filtered := redactUpstreamPassthroughForReadonlyAdmin(value); filtered != nil {
+				redacted[key] = filtered
+			}
+			continue
+		}
+		redacted[key] = value
 	}
 	return redacted
+}
+
+// RedactAccountForReadonlyAdmin narrows an already-built *Account DTO down to
+// what is safe to return to the readonly_admin role. It covers BOTH the
+// free-form Extra map (via RedactExtraForReadonlyAdmin) AND typed top-level
+// fields that mirror a denied Extra key under a different JSON name.
+//
+// CustomBaseURL mirrors the denied Extra["custom_base_url"] key: it is
+// populated in AccountFromServiceShallow (mappers.go) via
+// a.GetCustomBaseURL(), which reads the very same Extra["custom_base_url"]
+// string this table denies (the URL may embed credentials in a query
+// parameter). Filtering only the Extra map and not this typed field left the
+// value reachable through a parallel path — this function closes that gap.
+// CustomBaseURLEnabled is left untouched: whether a custom base URL is
+// configured at all is exactly the channel-provenance signal this read-only
+// role exists to show; only the URL value itself is sensitive.
+//
+// Every other typed field on Account was audited against this same question
+// (does it mirror a denied Extra key, or any other data this task classified
+// deny-worthy?) as part of fixing the CustomBaseURL leak — see
+// task-6b-report.md's "Fix round 1" section for the full field-by-field
+// walk. CustomBaseURL was the only offender found.
+func RedactAccountForReadonlyAdmin(out *Account) {
+	if out == nil {
+		return
+	}
+	out.Extra = RedactExtraForReadonlyAdmin(out.Extra)
+	out.CustomBaseURL = nil
 }

@@ -222,20 +222,22 @@ func (h *AccountHandler) accountResponseFromService(account *service.Account) *d
 	return out
 }
 
-// redactAccountExtraForReadonlyAdmin narrows out.Extra to the readonly_admin
-// allowlist (dto.RedactExtraForReadonlyAdmin) when the caller's role is
+// redactAccountForReadonlyAdmin narrows out (both the free-form Extra map and
+// any typed field that mirrors a denied Extra key, e.g. CustomBaseURL — see
+// dto.RedactAccountForReadonlyAdmin) when the caller's role is
 // service.RoleReadonlyAdmin. It is a no-op for every other role, including
-// service.RoleAdmin, which must keep seeing Extra exactly as stored (task-6b).
+// service.RoleAdmin, which must keep seeing the account exactly as stored
+// (task-6b).
 //
 // Only List and GetByID are on the readonly_admin allowlist
 // (backend/internal/server/middleware/readonly_admin.go) and return a
-// dto.Account carrying Extra, so only those two call this helper.
-func redactAccountExtraForReadonlyAdmin(c *gin.Context, out *dto.Account) {
+// dto.Account, so only those two call this helper.
+func redactAccountForReadonlyAdmin(c *gin.Context, out *dto.Account) {
 	if out == nil {
 		return
 	}
 	if role, ok := middleware.GetUserRoleFromContext(c); ok && role == service.RoleReadonlyAdmin {
-		out.Extra = dto.RedactExtraForReadonlyAdmin(out.Extra)
+		dto.RedactAccountForReadonlyAdmin(out)
 	}
 }
 
@@ -672,7 +674,7 @@ func (h *AccountHandler) List(c *gin.Context) {
 			SchedulerScore:     schedulerScores[acc.ID],
 			SchedulerScores:    schedulerGroupScores[acc.ID],
 		}
-		redactAccountExtraForReadonlyAdmin(c, item.Account)
+		redactAccountForReadonlyAdmin(c, item.Account)
 
 		// 添加窗口费用（仅当启用时）
 		if windowCosts != nil {
@@ -806,7 +808,7 @@ func (h *AccountHandler) GetByID(c *gin.Context) {
 	}
 
 	item := h.buildAccountResponseWithRuntime(c.Request.Context(), account)
-	redactAccountExtraForReadonlyAdmin(c, item.Account)
+	redactAccountForReadonlyAdmin(c, item.Account)
 	response.Success(c, item)
 }
 
