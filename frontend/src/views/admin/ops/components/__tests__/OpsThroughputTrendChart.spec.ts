@@ -20,6 +20,12 @@ vi.mock('vue-chartjs', () => ({
   },
 }))
 
+vi.mock('@/stores', () => ({
+  useAuthStore: () => ({
+    isReadonlyAdmin: false,
+  }),
+}))
+
 describe('OpsThroughputTrendChart', () => {
   it('allows the header controls to wrap on narrow screens', () => {
     const wrapper = mount(OpsThroughputTrendChart, {
