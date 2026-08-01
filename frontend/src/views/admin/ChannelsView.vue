@@ -39,7 +39,7 @@
             >
               <Icon name="refresh" size="md" :class="loading ? 'animate-spin' : ''" />
             </button>
-            <button @click="openCreateDialog" class="btn btn-primary">
+            <button v-if="!isReadonlyAdmin" @click="openCreateDialog" class="btn btn-primary">
               <Icon name="plus" size="md" class="mr-2" />
               {{ t('admin.channels.createChannel', 'Create Channel') }}
             </button>
@@ -66,10 +66,12 @@
           </template>
 
           <template #cell-status="{ row }">
-            <Toggle
-              :modelValue="row.status === 'active'"
-              @update:modelValue="toggleChannelStatus(row)"
-            />
+            <span :class="{ 'pointer-events-none opacity-60': isReadonlyAdmin }">
+              <Toggle
+                :modelValue="row.status === 'active'"
+                @update:modelValue="toggleChannelStatus(row)"
+              />
+            </span>
           </template>
 
           <template #cell-group_count="{ row }">
@@ -106,6 +108,7 @@
                 <span class="text-xs">{{ t('common.edit', 'Edit') }}</span>
               </button>
               <button
+                v-if="!isReadonlyAdmin"
                 @click="handleDelete(row)"
                 class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
               >
@@ -119,7 +122,7 @@
             <EmptyState
               :title="t('admin.channels.noChannelsYet', 'No Channels Yet')"
               :description="t('admin.channels.createFirstChannel', 'Create your first channel to manage model pricing')"
-              :action-text="t('admin.channels.createChannel', 'Create Channel')"
+              :action-text="isReadonlyAdmin ? undefined : t('admin.channels.createChannel', 'Create Channel')"
               @action="openCreateDialog"
             />
           </template>
@@ -182,6 +185,7 @@
                 v-model="form.name"
                 type="text"
                 required
+                :disabled="isReadonlyAdmin"
                 class="input"
                 :placeholder="t('admin.channels.form.namePlaceholder', 'Enter channel name')"
               />
@@ -193,6 +197,7 @@
               <textarea
                 v-model="form.description"
                 rows="2"
+                :disabled="isReadonlyAdmin"
                 class="input"
                 :placeholder="t('admin.channels.form.descriptionPlaceholder', 'Optional description')"
               ></textarea>
@@ -201,7 +206,7 @@
             <!-- Status (edit only) -->
             <div v-if="editingChannel">
               <label class="input-label">{{ t('admin.channels.form.status', 'Status') }}</label>
-              <Select v-model="form.status" :options="statusEditOptions" />
+              <Select v-model="form.status" :options="statusEditOptions" :disabled="isReadonlyAdmin" />
             </div>
 
             <!-- Model Restriction -->
@@ -210,6 +215,7 @@
                 <input
                   type="checkbox"
                   v-model="form.restrict_models"
+                  :disabled="isReadonlyAdmin"
                   class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                 />
                 <span class="input-label mb-0">{{ t('admin.channels.form.restrictModels', 'Restrict Models') }}</span>
@@ -222,7 +228,7 @@
             <!-- Billing Basis -->
             <div>
               <label class="input-label">{{ t('admin.channels.form.billingModelSource', 'Billing Basis') }}</label>
-              <Select v-model="form.billing_model_source" :options="billingModelSourceOptions" />
+              <Select v-model="form.billing_model_source" :options="billingModelSourceOptions" :disabled="isReadonlyAdmin" />
               <p class="mt-1 text-xs text-gray-400">
                 {{ t('admin.channels.form.billingModelSourceHint', 'Controls which model name is used for pricing lookup') }}
               </p>
@@ -243,6 +249,7 @@
                   <input
                     type="checkbox"
                     :checked="activePlatforms.includes(p)"
+                    :disabled="isReadonlyAdmin"
                     class="h-3.5 w-3.5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                     @change="togglePlatform(p)"
                   />
@@ -263,10 +270,12 @@
                     {{ t('admin.channels.form.applyPricingToAccountStatsDesc') }}
                   </p>
                 </div>
-                <Toggle
-                  :modelValue="form.apply_pricing_to_account_stats"
-                  @update:modelValue="form.apply_pricing_to_account_stats = $event"
-                />
+                <span :class="{ 'pointer-events-none opacity-60': isReadonlyAdmin }">
+                  <Toggle
+                    :modelValue="form.apply_pricing_to_account_stats"
+                    @update:modelValue="form.apply_pricing_to_account_stats = $event"
+                  />
+                </span>
               </div>
             </div>
           </div>
@@ -306,7 +315,7 @@
                     <input
                       type="checkbox"
                       :checked="section.group_ids.includes(group.id)"
-                      :disabled="isGroupInOtherChannel(group.id, section.platform)"
+                      :disabled="isGroupInOtherChannel(group.id, section.platform) || isReadonlyAdmin"
                       class="h-3 w-3 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                       @change="toggleGroupInSection(sIdx, group.id)"
                     />
@@ -335,7 +344,9 @@
                     {{ t('admin.channels.form.webSearchEmulationHint') }}
                   </p>
                 </div>
-                <Toggle v-model="section.web_search_emulation" />
+                <span :class="{ 'pointer-events-none opacity-60': isReadonlyAdmin }">
+                  <Toggle v-model="section.web_search_emulation" />
+                </span>
               </div>
             </div>
 
@@ -350,7 +361,9 @@
                     {{ t('admin.channels.form.codexImageGenerationBridgeHint') }}
                   </p>
                 </div>
-                <Toggle v-model="section.codex_image_generation_bridge" />
+                <span :class="{ 'pointer-events-none opacity-60': isReadonlyAdmin }">
+                  <Toggle v-model="section.codex_image_generation_bridge" />
+                </span>
               </div>
             </div>
 
@@ -365,7 +378,9 @@
                     {{ t('admin.channels.form.bedrockCCCompatHint') }}
                   </p>
                 </div>
-                <Toggle v-model="section.bedrock_cc_compat" />
+                <span :class="{ 'pointer-events-none opacity-60': isReadonlyAdmin }">
+                  <Toggle v-model="section.bedrock_cc_compat" />
+                </span>
               </div>
             </div>
 
@@ -373,7 +388,7 @@
             <div>
               <div class="mb-1 flex items-center justify-between">
                 <label class="input-label text-xs mb-0">{{ t('admin.channels.form.modelMapping', 'Model Mapping') }}</label>
-                <button type="button" @click="addMappingEntry(sIdx)" class="text-xs text-primary-600 hover:text-primary-700">
+                <button v-if="!isReadonlyAdmin" type="button" @click="addMappingEntry(sIdx)" class="text-xs text-primary-600 hover:text-primary-700">
                   + {{ t('common.add', 'Add') }}
                 </button>
               </div>
@@ -392,6 +407,7 @@
                   <input
                     :value="srcModel"
                     type="text"
+                    :disabled="isReadonlyAdmin"
                     class="input flex-1 text-xs"
                     :class="platformTextClass(section.platform)"
                     :placeholder="t('admin.channels.form.mappingSource', 'Source model')"
@@ -401,12 +417,14 @@
                   <input
                     :value="section.model_mapping[srcModel]"
                     type="text"
+                    :disabled="isReadonlyAdmin"
                     class="input flex-1 text-xs"
                     :class="platformTextClass(section.platform)"
                     :placeholder="t('admin.channels.form.mappingTarget', 'Target model')"
                     @input="section.model_mapping[srcModel] = ($event.target as HTMLInputElement).value"
                   />
                   <button
+                    v-if="!isReadonlyAdmin"
                     type="button"
                     @click="removeMappingEntry(sIdx, srcModel)"
                     class="rounded p-0.5 text-gray-400 hover:text-red-500"
@@ -421,7 +439,7 @@
             <div>
               <div class="mb-1 flex items-center justify-between">
                 <label class="input-label text-xs mb-0">{{ t('admin.channels.form.modelPricing', 'Model Pricing') }}</label>
-                <div class="flex items-center gap-2">
+                <div v-if="!isReadonlyAdmin" class="flex items-center gap-2">
                   <button
                     type="button"
                     @click="syncLatestModels(sIdx)"
@@ -447,6 +465,7 @@
                   :key="idx"
                   :entry="entry"
                   :platform="section.platform"
+                  :readonly="isReadonlyAdmin"
                   @update="updatePricingEntry(sIdx, idx, $event)"
                   @remove="removePricingEntry(sIdx, idx)"
                 />
@@ -460,6 +479,7 @@
                   {{ t('admin.channels.form.accountStatsPricingRules') }}
                 </h4>
                 <button
+                  v-if="!isReadonlyAdmin"
                   type="button"
                   @click="addAccountStatsRule(sIdx)"
                   class="rounded-lg border border-primary-300 px-3 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50 dark:border-primary-600 dark:text-primary-400 dark:hover:bg-primary-900/20"
@@ -484,10 +504,11 @@
                 <div class="flex items-center justify-between">
                   <input
                     v-model="rule.name"
+                    :disabled="isReadonlyAdmin"
                     :placeholder="t('admin.channels.form.ruleName')"
                     class="bg-transparent text-sm font-medium text-gray-700 placeholder-gray-400 outline-none dark:text-gray-300"
                   />
-                  <button type="button" @click="removeAccountStatsRule(sIdx, ruleIndex)" class="text-xs text-red-500 hover:text-red-700">
+                  <button v-if="!isReadonlyAdmin" type="button" @click="removeAccountStatsRule(sIdx, ruleIndex)" class="text-xs text-red-500 hover:text-red-700">
                     {{ t('common.delete') }}
                   </button>
                 </div>
@@ -503,7 +524,7 @@
                         ? 'border-primary-300 bg-primary-50 dark:border-primary-700 dark:bg-primary-900/20'
                         : 'border-gray-200 hover:bg-gray-50 dark:border-dark-600 dark:hover:bg-dark-700'"
                     >
-                      <input type="checkbox" :checked="rule.group_ids.includes(gid)" class="h-3 w-3 rounded border-gray-300 text-primary-600 focus:ring-primary-500" @change="rule.group_ids.includes(gid) ? rule.group_ids.splice(rule.group_ids.indexOf(gid), 1) : rule.group_ids.push(gid)" />
+                      <input type="checkbox" :checked="rule.group_ids.includes(gid)" :disabled="isReadonlyAdmin" class="h-3 w-3 rounded border-gray-300 text-primary-600 focus:ring-primary-500" @change="rule.group_ids.includes(gid) ? rule.group_ids.splice(rule.group_ids.indexOf(gid), 1) : rule.group_ids.push(gid)" />
                       <span :class="['font-medium', platformTextClass(section.platform)]">{{ getGroupNameById(gid) }}</span>
                     </label>
                   </div>
@@ -522,7 +543,7 @@
                       class="inline-flex items-center gap-1 rounded-md border border-primary-300 bg-primary-50 px-2 py-0.5 text-xs dark:border-primary-700 dark:bg-primary-900/20"
                     >
                       <span :class="['font-medium', platformTextClass(section.platform)]">{{ getRuleAccountLabel(accountId) }}</span>
-                      <button type="button" @click="removeRuleAccount(rule, accountId)" class="text-gray-400 hover:text-red-500">
+                      <button v-if="!isReadonlyAdmin" type="button" @click="removeRuleAccount(rule, accountId)" class="text-gray-400 hover:text-red-500">
                         <Icon name="x" size="xs" />
                       </button>
                     </span>
@@ -532,6 +553,7 @@
                     <input
                       v-model="ruleAccountSearchKeyword[`${section.platform}-${ruleIndex}`]"
                       type="text"
+                      :disabled="isReadonlyAdmin"
                       class="input text-sm"
                       :placeholder="t('admin.channels.form.searchAccountPlaceholder')"
                       @input="onRuleAccountSearchInput(section.platform, ruleIndex)"
@@ -564,7 +586,7 @@
                 <div>
                   <div class="mb-1 flex items-center justify-between">
                     <label class="text-xs text-gray-500 dark:text-gray-400">{{ t('admin.channels.form.ruleModelPricing') }}</label>
-                    <button type="button" @click="addRulePricingEntry(sIdx, ruleIndex)" class="text-xs text-primary-600 hover:text-primary-700">
+                    <button v-if="!isReadonlyAdmin" type="button" @click="addRulePricingEntry(sIdx, ruleIndex)" class="text-xs text-primary-600 hover:text-primary-700">
                       + {{ t('common.add') }}
                     </button>
                   </div>
@@ -577,6 +599,7 @@
                       :key="pIdx"
                       :entry="entry"
                       :platform="section.platform"
+                      :readonly="isReadonlyAdmin"
                       @update="rule.pricing.splice(pIdx, 1, $event)"
                       @remove="removeRulePricingEntry(sIdx, ruleIndex, pIdx)"
                     />
@@ -594,6 +617,7 @@
             {{ t('common.cancel', 'Cancel') }}
           </button>
           <button
+            v-if="!isReadonlyAdmin"
             type="submit"
             form="channel-form"
             :disabled="submitting"
@@ -628,6 +652,7 @@
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
+import { useAuthStore } from '@/stores/auth'
 import { extractApiErrorMessage } from '@/utils/apiError'
 import { adminAPI } from '@/api/admin'
 import type { Channel, ChannelModelPricing, CreateChannelRequest, UpdateChannelRequest, AccountStatsPricingRule } from '@/api/admin/channels'
@@ -653,6 +678,8 @@ import { useKeyedDebouncedSearch } from '@/composables/useKeyedDebouncedSearch'
 
 const { t } = useI18n()
 const appStore = useAppStore()
+const authStore = useAuthStore()
+const isReadonlyAdmin = computed(() => authStore.isReadonlyAdmin)
 
 // Web Search global enabled state (loaded once on mount)
 const webSearchGlobalEnabled = ref(false)
