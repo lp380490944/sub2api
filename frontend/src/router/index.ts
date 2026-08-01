@@ -13,6 +13,7 @@ import { useRoutePrefetch } from '@/composables/useRoutePrefetch'
 import { getSetupStatus } from '@/api/setup'
 import { resolveCompletedSetupRedirectPath } from './setupRedirect'
 import { resolveRouteDocumentTitle } from './title'
+import { isReadonlyAdminPathAllowed, READONLY_ADMIN_HOME } from './readonlyAdminPaths'
 
 /**
  * Route definitions with lazy loading
@@ -838,6 +839,14 @@ router.beforeEach(async (to, _from, next) => {
     authInitialized = true
   }
 
+  // 登录后/需要跳转到"首页"时使用的落地路径。/admin/dashboard 对 readonly_admin
+  // 不可用（会被下方白名单守卫再次重定向），因此该角色单独落到自己的白名单首页。
+  const resolveHomePath = (): string => {
+    if (authStore.isAdmin) return '/admin/dashboard'
+    if (authStore.isReadonlyAdmin) return READONLY_ADMIN_HOME
+    return '/dashboard'
+  }
+
   // Set page title
   const appStore = useAppStore()
   const adminSettingsStore = useAdminSettingsStore()
@@ -867,14 +876,16 @@ router.beforeEach(async (to, _from, next) => {
   if (!requiresAuth) {
     // If already authenticated and trying to access login/register, redirect to appropriate dashboard
     if (authStore.isAuthenticated && (to.path === '/login' || to.path === '/register')) {
-      // In backend mode, non-admin users should NOT be redirected away from login
-      // (they are blocked from all protected routes, so redirecting would cause a loop)
-      if (appStore.backendModeEnabled && !authStore.isAdmin) {
+      // In backend mode, users who cannot reach the admin panel at all should NOT be
+      // redirected away from login (they are blocked from all protected routes, so
+      // redirecting would cause a loop). readonly_admin can reach its whitelisted
+      // pages, so it is routed to its landing page below instead.
+      if (appStore.backendModeEnabled && !authStore.canAccessAdminPanel) {
         next()
         return
       }
-      // Admin users go to admin dashboard, regular users go to user dashboard
-      next(authStore.isAdmin ? '/admin/dashboard' : '/dashboard')
+      // Admin/readonly_admin users go to their admin landing page, regular users go to user dashboard
+      next(resolveHomePath())
       return
     }
     // Model Plaza:公开路由但受「启用开关 + 可选强制登录」双重控制(后端同口径 fail-closed)
@@ -889,21 +900,15 @@ router.beforeEach(async (to, _from, next) => {
       const plazaSettings = appStore.cachedPublicSettings
       // 仅在设置成功加载且明确为 false 时拦截(瞬时加载失败视为未知,由后端 404 兜底)
       if (appStore.publicSettingsLoaded && plazaSettings?.model_plaza_enabled === false) {
-        next(
-          authStore.isAuthenticated
-            ? authStore.isAdmin
-              ? '/admin/dashboard'
-              : '/dashboard'
-            : '/home'
-        )
+        next(authStore.isAuthenticated ? resolveHomePath() : '/home')
         return
       }
       if (plazaSettings?.model_plaza_require_auth === true && !authStore.isAuthenticated) {
         next({ path: '/login', query: { redirect: to.fullPath } })
         return
       }
-      // Backend mode:登录的非管理员也不可见(匿名由下方公共拦截处理,广场不在白名单)
-      if (appStore.backendModeEnabled && authStore.isAuthenticated && !authStore.isAdmin) {
+      // Backend mode:登录但无法进入后台的用户也不可见(匿名由下方公共拦截处理,广场不在白名单)
+      if (appStore.backendModeEnabled && authStore.isAuthenticated && !authStore.canAccessAdminPanel) {
         next('/login')
         return
       }
@@ -931,9 +936,16 @@ router.beforeEach(async (to, _from, next) => {
   }
 
   // Check admin requirement
-  if (requiresAdmin && !authStore.isAdmin) {
-    // User is authenticated but not admin, redirect to user dashboard
+  if (requiresAdmin && !authStore.canAccessAdminPanel) {
+    // User is authenticated but cannot access the admin panel at all, redirect to user dashboard
     next('/dashboard')
+    return
+  }
+
+  // readonly_admin 只能进入白名单内的管理页面，其余重定向到落地页。
+  // 后端对未放行端点返回 403，这里只是避免用户看到满屏报错。
+  if (requiresAdmin && authStore.isReadonlyAdmin && !isReadonlyAdminPathAllowed(to.path)) {
+    next(READONLY_ADMIN_HOME)
     return
   }
 
@@ -970,7 +982,7 @@ router.beforeEach(async (to, _from, next) => {
     appStore.publicSettingsLoaded &&
     appStore.cachedPublicSettings?.payment_enabled === false
   ) {
-    next(authStore.isAdmin ? '/admin/dashboard' : '/dashboard')
+    next(resolveHomePath())
     return
   }
 
@@ -995,14 +1007,16 @@ router.beforeEach(async (to, _from, next) => {
 
     if (restrictedPaths.some((path) => to.path.startsWith(path))) {
       // 简易模式下访问受限页面,重定向到仪表板
-      next(authStore.isAdmin ? '/admin/dashboard' : '/dashboard')
+      next(resolveHomePath())
       return
     }
   }
 
-  // Backend mode: admin gets full access, non-admin blocked
+  // Backend mode: users who can reach the admin panel get full access, everyone else is blocked.
+  // readonly_admin already passed the requiresAdmin whitelist check above (if applicable), so it
+  // is safe to let it through here too — otherwise it would be bounced to /login right after.
   if (appStore.backendModeEnabled) {
-    if (authStore.isAuthenticated && authStore.isAdmin) {
+    if (authStore.isAuthenticated && authStore.canAccessAdminPanel) {
       next()
       return
     }
