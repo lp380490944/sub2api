@@ -497,6 +497,11 @@ func (r *userRepository) ListWithFilters(ctx context.Context, params pagination.
 
 	q := r.client.User.Query()
 
+	// RestrictToUserID 是安全边界，最先 AND 上去，不受后续任何过滤条件影响。
+	if filters.RestrictToUserID > 0 {
+		q = q.Where(dbuser.IDEQ(filters.RestrictToUserID))
+	}
+
 	if filters.Status != "" {
 		q = q.Where(dbuser.StatusEQ(filters.Status))
 	}
