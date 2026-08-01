@@ -876,11 +876,14 @@ router.beforeEach(async (to, _from, next) => {
   if (!requiresAuth) {
     // If already authenticated and trying to access login/register, redirect to appropriate dashboard
     if (authStore.isAuthenticated && (to.path === '/login' || to.path === '/register')) {
-      // In backend mode, users who cannot reach the admin panel at all should NOT be
-      // redirected away from login (they are blocked from all protected routes, so
-      // redirecting would cause a loop). readonly_admin can reach its whitelisted
-      // pages, so it is routed to its landing page below instead.
-      if (appStore.backendModeEnabled && !authStore.canAccessAdminPanel) {
+      // In backend mode, users who are not admin should NOT be redirected away from
+      // login (they are blocked from all protected routes, so redirecting would cause
+      // a loop). readonly_admin is intentionally NOT supported in backend mode: the
+      // backend auth handlers (backend/internal/handler/auth_handler.go Login/RefreshToken,
+      // backend/internal/handler/passkey_handler.go) gate backend-mode login on
+      // user.IsAdmin()/UserRole=="admin", so a readonly_admin session can never actually
+      // reach the panel here — keep this on isAdmin, not canAccessAdminPanel.
+      if (appStore.backendModeEnabled && !authStore.isAdmin) {
         next()
         return
       }
@@ -907,8 +910,12 @@ router.beforeEach(async (to, _from, next) => {
         next({ path: '/login', query: { redirect: to.fullPath } })
         return
       }
-      // Backend mode:登录但无法进入后台的用户也不可见(匿名由下方公共拦截处理,广场不在白名单)
-      if (appStore.backendModeEnabled && authStore.isAuthenticated && !authStore.canAccessAdminPanel) {
+      // Backend mode:非 admin 用户也不可见(匿名由下方公共拦截处理,广场不在白名单)。
+      // readonly_admin 在后端模式下不受支持——后端登录/2FA/passkey/刷新 token 均按
+      // user.IsAdmin()/UserRole=="admin" 校验(backend/internal/handler/auth_handler.go,
+      // backend/internal/handler/passkey_handler.go),该角色根本登录不进后端模式，
+      // 因此这里保持 isAdmin，不能换成 canAccessAdminPanel。
+      if (appStore.backendModeEnabled && authStore.isAuthenticated && !authStore.isAdmin) {
         next('/login')
         return
       }
@@ -1012,11 +1019,15 @@ router.beforeEach(async (to, _from, next) => {
     }
   }
 
-  // Backend mode: users who can reach the admin panel get full access, everyone else is blocked.
-  // readonly_admin already passed the requiresAdmin whitelist check above (if applicable), so it
-  // is safe to let it through here too — otherwise it would be bounced to /login right after.
+  // Backend mode: admins get full access, everyone else is blocked. readonly_admin is
+  // intentionally NOT supported in backend mode — the backend auth handlers gate
+  // login/2FA/passkey on user.IsAdmin() (backend/internal/handler/auth_handler.go,
+  // backend/internal/handler/passkey_handler.go) and token refresh on
+  // UserRole=="admin" (backend/internal/handler/auth_handler.go RefreshToken), so a
+  // readonly_admin can never establish or keep a session here anyway. Keep this on
+  // isAdmin, not canAccessAdminPanel.
   if (appStore.backendModeEnabled) {
-    if (authStore.isAuthenticated && authStore.canAccessAdminPanel) {
+    if (authStore.isAuthenticated && authStore.isAdmin) {
       next()
       return
     }

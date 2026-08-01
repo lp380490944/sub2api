@@ -181,7 +181,14 @@ describe('feature route guard', () => {
   })
 
   describe('backend mode admin panel access', () => {
-    it('lets readonly_admin reach a whitelisted admin page (regression: line ~1019 must use canAccessAdminPanel, not isAdmin)', async () => {
+    // readonly_admin is NOT supported in backend mode: the backend auth handlers
+    // (backend/internal/handler/auth_handler.go Login/RefreshToken,
+    // backend/internal/handler/passkey_handler.go) gate backend-mode login/2FA/passkey
+    // and token refresh on user.IsAdmin() / UserRole=="admin", so the role can never
+    // actually establish or keep a session when backend mode is on. The router must
+    // fail closed here too — this is a regression test for the backend-mode gates in
+    // @/router staying on isAdmin, not canAccessAdminPanel.
+    it('blocks readonly_admin from a whitelisted admin page in backend mode, redirecting to /login', async () => {
       authStore.isAdmin = false
       authStore.isReadonlyAdmin = true
       authStore.canAccessAdminPanel = true
@@ -191,7 +198,7 @@ describe('feature route guard', () => {
       await navigation
 
       expect(next).toHaveBeenCalledOnce()
-      expect(next).toHaveBeenCalledWith()
+      expect(next).toHaveBeenCalledWith('/login')
     })
 
     it('still lets a real admin reach admin pages', async () => {
@@ -231,6 +238,22 @@ describe('feature route guard', () => {
 
       expect(next).toHaveBeenCalledOnce()
       expect(next).toHaveBeenCalledWith('/admin/accounts')
+    })
+
+    // Proves the revert above only removed backend-mode support and did not touch the
+    // general requiresAdmin admission gate: with backend mode OFF, readonly_admin must
+    // still reach a whitelisted admin page normally.
+    it('still lets readonly_admin reach a whitelisted admin page when backend mode is off', async () => {
+      authStore.isAdmin = false
+      authStore.isReadonlyAdmin = true
+      authStore.canAccessAdminPanel = true
+      appStore.backendModeEnabled = false
+
+      const { navigation, next } = runGuard({ requiresAdmin: true }, '/admin/accounts')
+      await navigation
+
+      expect(next).toHaveBeenCalledOnce()
+      expect(next).toHaveBeenCalledWith()
     })
   })
 })
