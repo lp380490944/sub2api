@@ -90,6 +90,16 @@ export const useAuthStore = defineStore('auth', () => {
     return user.value?.role === 'admin'
   })
 
+  const isReadonlyAdmin = computed(() => {
+    return user.value?.role === 'readonly_admin'
+  })
+
+  // 能否进入管理后台大门。具体能看哪些页面由路由守卫与侧边栏白名单决定，
+  // 真正的权限边界在后端 ReadonlyAdminGuard。
+  const canAccessAdminPanel = computed(() => {
+    return isAdmin.value || isReadonlyAdmin.value
+  })
+
   const isSimpleMode = computed(() => runMode.value === 'simple')
   const hasPendingAuthSession = computed(() => pendingAuthSession.value !== null)
 
@@ -492,6 +502,8 @@ export const useAuthStore = defineStore('auth', () => {
     // Computed
     isAuthenticated,
     isAdmin,
+    isReadonlyAdmin,
+    canAccessAdminPanel,
     isSimpleMode,
     hasPendingAuthSession,
 
