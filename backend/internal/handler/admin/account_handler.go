@@ -674,7 +674,6 @@ func (h *AccountHandler) List(c *gin.Context) {
 			SchedulerScore:     schedulerScores[acc.ID],
 			SchedulerScores:    schedulerGroupScores[acc.ID],
 		}
-		redactAccountForReadonlyAdmin(c, item.Account)
 
 		// 添加窗口费用（仅当启用时）
 		if windowCosts != nil {
@@ -701,6 +700,12 @@ func (h *AccountHandler) List(c *gin.Context) {
 	}
 
 	h.enrichShadowParents(c.Request.Context(), result)
+
+	// 脱敏必须在全部字段回填完成之后执行（含 enrichShadowParents 写入的
+	// typed Parent* 字段），否则后续的富化步骤可能悄悄撤销脱敏。
+	for i := range result {
+		redactAccountForReadonlyAdmin(c, result[i].Account)
+	}
 
 	etag := buildAccountsListETag(result, total, page, pageSize, platform, accountType, status, search, lite)
 	if etag != "" {
