@@ -3,6 +3,7 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { describe, expect, it } from 'vitest'
+import { isReadonlyAdminPathAllowed } from '@/router/readonlyAdminPaths'
 
 const componentPath = resolve(dirname(fileURLToPath(import.meta.url)), '../AppSidebar.vue')
 const componentSource = readFileSync(componentPath, 'utf8')
@@ -93,11 +94,51 @@ describe('AppSidebar readonly_admin gating', () => {
   })
 
   it('filters both top-level items and nested children through isReadonlyAdminPathAllowed', () => {
-    const filterBlockMatch = componentSource.match(/if \(isReadonlyAdmin\.value\) \{[\s\S]*?\n  \}/)
+    const filterBlockMatch = componentSource.match(/if \(isReadonlyAdmin\.value\) \{[\s\S]*?\n {2}\}/)
     expect(filterBlockMatch).not.toBeNull()
     expect(filterBlockMatch?.[0]).toContain('.filter((item) => isReadonlyAdminPathAllowed(item.path))')
     expect(filterBlockMatch?.[0]).toContain(
       'item.children.filter((c) => isReadonlyAdminPathAllowed(c.path))'
     )
+  })
+
+  // Functional replay: this reproduces the exact .filter()/.map() shape used by
+  // adminNavItems (asserted structurally above) against the REAL
+  // isReadonlyAdminPathAllowed from readonlyAdminPaths.ts — not a hand-copied
+  // reimplementation — using a fixture that mirrors the real /admin/channels
+  // baseItems entry (pricing + monitor children). This is what actually proves
+  // the resulting menu shape, since the source-string tests above only prove
+  // the wiring exists.
+  it('resulting menu: keeps Channels + Pricing, drops the Monitor child', () => {
+    type NavItem = { path: string; children?: NavItem[] }
+    const adminChannelsItem: NavItem = {
+      path: '/admin/channels',
+      children: [
+        { path: '/admin/channels/pricing' },
+        { path: '/admin/channels/monitor' }
+      ]
+    }
+    const baseItems: NavItem[] = [
+      { path: '/admin/dashboard' },
+      { path: '/admin/ops' },
+      { path: '/admin/users' },
+      { path: '/admin/groups' },
+      adminChannelsItem,
+      { path: '/admin/subscriptions' },
+      { path: '/admin/accounts' },
+      { path: '/admin/settings' }
+    ]
+
+    const result = baseItems
+      .filter((item) => isReadonlyAdminPathAllowed(item.path))
+      .map((item) =>
+        item.children
+          ? { ...item, children: item.children.filter((c) => isReadonlyAdminPathAllowed(c.path)) }
+          : item
+      )
+
+    expect(result.map((i) => i.path)).toEqual(['/admin/ops', '/admin/users', '/admin/groups', '/admin/channels', '/admin/accounts'])
+    const channels = result.find((i) => i.path === '/admin/channels')
+    expect(channels?.children?.map((c) => c.path)).toEqual(['/admin/channels/pricing'])
   })
 })
