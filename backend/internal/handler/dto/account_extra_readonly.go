@@ -265,3 +265,23 @@ func RedactAccountForReadonlyAdmin(out *Account) {
 	out.Extra = RedactExtraForReadonlyAdmin(out.Extra)
 	out.CustomBaseURL = nil
 }
+
+// RedactAccountGroupsForReadonlyAdmin applies RedactAccountForReadonlyAdmin to
+// every embedded Account found on a slice of AccountGroup.
+//
+// AccountGroup.Account (see AdminGroup.AccountGroups) is a full, otherwise
+// UNREDACTED Account DTO embedded for convenience by AccountGroupFromService.
+// It is unreachable in production today only because the group repository
+// never populates Group.AccountGroups for the admin group-read endpoints —
+// an incidental gap, not a deliberate guarantee. A single future eager-load
+// (e.g. to save an admin-UI round trip) would turn this into a live leak of
+// upstream credentials to readonly_admin with no test in the way.
+//
+// Call this defensively wherever an AdminGroup (or its AccountGroups) is
+// about to be sent to a readonly_admin caller, regardless of whether the
+// field is expected to be populated.
+func RedactAccountGroupsForReadonlyAdmin(groups []AccountGroup) {
+	for i := range groups {
+		RedactAccountForReadonlyAdmin(groups[i].Account)
+	}
+}

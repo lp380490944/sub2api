@@ -178,3 +178,55 @@ func TestRedactAccountForReadonlyAdmin_NilsCustomBaseURLButKeepsEnabledToggle(t 
 func TestRedactAccountForReadonlyAdmin_NilAccountNoop(t *testing.T) {
 	RedactAccountForReadonlyAdmin(nil) // must not panic
 }
+
+// TestRedactAccountGroupsForReadonlyAdmin_RedactsEmbeddedAccount guards the
+// latent leak path: AccountGroupFromService always embeds a full, otherwise
+// UNREDACTED Account DTO on AccountGroup.Account (reachable via
+// AdminGroup.AccountGroups on GET /groups, /groups/all, /groups/:id). It is
+// unreachable in production today only because the group repository never
+// populates Group.AccountGroups for those endpoints — an incidental gap, not
+// a guarantee. This test is meaningful precisely because it does not depend
+// on that gap: it constructs the DTO shape directly, so a future eager-load
+// that starts populating the field is covered from day one.
+func TestRedactAccountGroupsForReadonlyAdmin_RedactsEmbeddedAccount(t *testing.T) {
+	url := "https://relay.internal/?key=sk-embedded-secret"
+	groups := []AccountGroup{
+		{
+			AccountID: 1,
+			GroupID:   1,
+			Account: &Account{
+				ID:            1,
+				CustomBaseURL: &url,
+				Extra: map[string]any{
+					"custom_base_url":        url,
+					"enable_tls_fingerprint": true,
+					"secret_header":          "Bearer sk-should-not-leak",
+				},
+			},
+		},
+		// A nil embedded Account (the production-typical shape today) must not
+		// panic.
+		{AccountID: 2, GroupID: 1, Account: nil},
+	}
+
+	RedactAccountGroupsForReadonlyAdmin(groups)
+
+	acc := groups[0].Account
+	if acc.CustomBaseURL != nil {
+		t.Fatalf("expected embedded Account.CustomBaseURL to be nilled, got %q", *acc.CustomBaseURL)
+	}
+	if _, ok := acc.Extra["custom_base_url"]; ok {
+		t.Fatalf("expected embedded Account Extra[custom_base_url] to be dropped, got %#v", acc.Extra)
+	}
+	if _, ok := acc.Extra["secret_header"]; ok {
+		t.Fatalf("expected embedded Account Extra[secret_header] to be dropped, got %#v", acc.Extra)
+	}
+	if _, ok := acc.Extra["enable_tls_fingerprint"]; !ok {
+		t.Fatalf("expected allowlisted Extra[enable_tls_fingerprint] to survive, got %#v", acc.Extra)
+	}
+}
+
+// TestRedactAccountGroupsForReadonlyAdmin_NilSliceNoop guards nil-safety.
+func TestRedactAccountGroupsForReadonlyAdmin_NilSliceNoop(t *testing.T) {
+	RedactAccountGroupsForReadonlyAdmin(nil) // must not panic
+}

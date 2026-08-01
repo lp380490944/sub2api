@@ -15,6 +15,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
 	"github.com/Wei-Shaw/sub2api/internal/platform/liveattestation"
+	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -25,6 +26,27 @@ type GroupHandler struct {
 	adminService         service.AdminService
 	dashboardService     *service.DashboardService
 	groupCapacityService *service.GroupCapacityService
+}
+
+// redactGroupForReadonlyAdmin narrows out any embedded, otherwise-unredacted
+// Account DTO on out.AccountGroups (see dto.RedactAccountGroupsForReadonlyAdmin)
+// when the caller's role is service.RoleReadonlyAdmin. No-op for every other
+// role, including service.RoleAdmin.
+//
+// Group.AccountGroups is not populated by the group repository today for any
+// of the three read endpoints this guards (List, GetAll, GetByID), so there is
+// no live leak — but AccountGroupFromService always embeds a full unredacted
+// dto.Account when the field IS populated, and that population is one
+// eager-load change away. Calling this unconditionally on every read response
+// keeps that future change safe by construction instead of relying on the
+// field staying empty.
+func redactGroupForReadonlyAdmin(c *gin.Context, out *dto.AdminGroup) {
+	if out == nil {
+		return
+	}
+	if role, ok := middleware.GetUserRoleFromContext(c); ok && role == service.RoleReadonlyAdmin {
+		dto.RedactAccountGroupsForReadonlyAdmin(out.AccountGroups)
+	}
 }
 
 // GetLiveCapability 返回当前服务端是否具备生成 Live attestation 的运行环境。
@@ -276,7 +298,9 @@ func (h *GroupHandler) List(c *gin.Context) {
 
 	outGroups := make([]dto.AdminGroup, 0, len(groups))
 	for i := range groups {
-		outGroups = append(outGroups, *dto.GroupFromServiceAdmin(&groups[i]))
+		item := dto.GroupFromServiceAdmin(&groups[i])
+		redactGroupForReadonlyAdmin(c, item)
+		outGroups = append(outGroups, *item)
 	}
 	response.Paginated(c, outGroups, total, page, pageSize)
 }
@@ -435,7 +459,9 @@ func (h *GroupHandler) GetAll(c *gin.Context) {
 
 	outGroups := make([]dto.AdminGroup, 0, len(groups))
 	for i := range groups {
-		outGroups = append(outGroups, *dto.GroupFromServiceAdmin(&groups[i]))
+		item := dto.GroupFromServiceAdmin(&groups[i])
+		redactGroupForReadonlyAdmin(c, item)
+		outGroups = append(outGroups, *item)
 	}
 	response.Success(c, outGroups)
 }
@@ -455,7 +481,9 @@ func (h *GroupHandler) GetByID(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, dto.GroupFromServiceAdmin(group))
+	item := dto.GroupFromServiceAdmin(group)
+	redactGroupForReadonlyAdmin(c, item)
+	response.Success(c, item)
 }
 
 // GetModelsListCandidates handles getting candidate model IDs for custom /v1/models list.
