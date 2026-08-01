@@ -26,6 +26,9 @@ func RegisterAdminRoutes(
 	// 审计中间件挂在认证之后：所有管理面变更类操作 + 敏感读取入审计日志
 	admin.Use(gin.HandlerFunc(auditLog))
 	admin.Use(middleware.AdminComplianceGuard(settingService))
+	// 只读管理员白名单授权：必须在 adminAuth（提供 role）与 auditLog（记录被拒尝试）之后。
+	// 对非 readonly_admin 角色零影响。
+	admin.Use(middleware.ReadonlyAdminGuard())
 	{
 		// 运行时指标（JSON / Prometheus text）
 		admin.GET("/metrics", h.Admin.Dashboard.GetRuntimeMetrics)

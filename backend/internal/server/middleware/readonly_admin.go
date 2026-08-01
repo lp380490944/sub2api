@@ -80,6 +80,7 @@ var readonlyAdminAllowlist = map[string]struct{}{
 	"GET /api/v1/admin/ops/request-errors":                     {},
 	"GET /api/v1/admin/ops/request-errors/:id":                 {},
 	"GET /api/v1/admin/ops/request-errors/:id/upstream-errors": {},
+	"GET /api/v1/admin/ops/ingress-rejections":                 {},
 	"GET /api/v1/admin/ops/ingress-rejections/health":          {},
 	"GET /api/v1/admin/ops/auth-cache-invalidation/health":     {},
 	"GET /api/v1/admin/ops/upstream-errors":                    {},
