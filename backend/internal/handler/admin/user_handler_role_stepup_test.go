@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -83,4 +84,39 @@ func TestCreateRegularUserSkipsStepUp(t *testing.T) {
 		"email": "new-user@example.com", "password": "pass123", "role": "user",
 	})
 	require.Equal(t, http.StatusOK, rec.Code)
+}
+
+// setupSelfDemoteRouter 注入认证上下文，模拟"当前登录管理员正在编辑自己的用户记录"
+// (被编辑用户 ID = 1，与认证上下文的 UserID 一致)，用于触发自我降级保护门。
+func setupSelfDemoteRouter(t *testing.T) *gin.Engine {
+	t.Helper()
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	adminSvc := newStubAdminService()
+	router.Use(func(c *gin.Context) {
+		c.Set(string(middleware.ContextKeyUser), middleware.AuthSubject{UserID: 1})
+		c.Next()
+	})
+	h := NewUserHandler(adminSvc, nil, nil, nil, nil, nil, nil)
+	router.PUT("/api/v1/admin/users/:id", h.Update)
+	return router
+}
+
+// 防锁死保护必须覆盖 admin -> readonly_admin 的自我降级，而不仅仅是 admin -> user。
+// 修复前该守卫只比较 req.Role == service.RoleUser，readonly_admin 会绕过检查。
+func TestUpdateUserSelfDemoteToReadonlyAdminRejected(t *testing.T) {
+	router := setupSelfDemoteRouter(t)
+
+	rec := doJSON(t, router, http.MethodPut, "/api/v1/admin/users/1", map[string]any{"role": "readonly_admin"})
+	require.Equal(t, http.StatusBadRequest, rec.Code)
+	require.Contains(t, rec.Body.String(), "cannot demote yourself from admin")
+}
+
+// 回归：既有的 admin -> user 自我降级保护必须保持不变。
+func TestUpdateUserSelfDemoteToUserStillRejected(t *testing.T) {
+	router := setupSelfDemoteRouter(t)
+
+	rec := doJSON(t, router, http.MethodPut, "/api/v1/admin/users/1", map[string]any{"role": "user"})
+	require.Equal(t, http.StatusBadRequest, rec.Code)
+	require.Contains(t, rec.Body.String(), "cannot demote yourself from admin")
 }
