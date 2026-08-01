@@ -64,6 +64,28 @@ func TestAdminComplianceGuardBlocksAdminRouteWhenMissing(t *testing.T) {
 	require.Contains(t, w.Body.String(), "ADMIN_COMPLIANCE_ACK_REQUIRED")
 }
 
+func TestAdminComplianceGuardExemptsReadonlyAdmin(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	svc := service.NewSettingService(&complianceGuardRepoStub{}, &config.Config{})
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set(string(ContextKeyUser), AuthSubject{UserID: 1})
+		c.Set(string(ContextKeyUserRole), service.RoleReadonlyAdmin)
+		c.Next()
+	})
+	router.Use(AdminComplianceGuard(svc))
+	router.GET("/api/v1/admin/users", func(c *gin.Context) {
+		c.String(http.StatusOK, "ok")
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/users", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code,
+		"readonly_admin must not be blocked by the compliance guard even when unacknowledged")
+}
+
 func TestAdminComplianceGuardBypassesComplianceEndpoint(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	svc := service.NewSettingService(&complianceGuardRepoStub{}, &config.Config{})
