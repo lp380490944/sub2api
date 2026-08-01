@@ -1,12 +1,15 @@
 package routes
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"sort"
 	"strings"
 	"testing"
 
 	"github.com/Wei-Shaw/sub2api/internal/handler"
 	servermiddleware "github.com/Wei-Shaw/sub2api/internal/server/middleware"
+	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 )
@@ -20,7 +23,9 @@ import (
 // 不对称是有意的：拒绝侧宽松只会让端点保持 403，放行侧宽松会泄露数据。
 var reviewedDenyPrefixes = []string{
 	"/api/v1/admin/settings",
-	"/api/v1/admin/orders",
+	// 支付管理端（含订单、订阅计划、渠道实例）。管理端订单的真实路径是
+	// /api/v1/admin/payment/orders，本前缀即已覆盖；计划书里那条独立的
+	// "/api/v1/admin/orders" 匹配不到任何路由，已按 DenyPrefixesAreAllLive 移除。
 	"/api/v1/admin/payment",
 	"/api/v1/admin/redeem",
 	"/api/v1/admin/promo-codes",
@@ -195,17 +200,36 @@ var reviewedDenyExact = map[string]struct{}{
 	"PUT /api/v1/admin/ops/upstream-errors/:id/resolve": {},
 }
 
+// newFullAdminRouter 注册【全部】管理端路由。
+//
+// 注意：并非所有 /api/v1/admin/** 路由都来自 RegisterAdminRoutes —— 支付管理端在
+// routes/payment.go 里另起了一个 v1.Group("/admin/payment")，有自己的中间件链。
+// 只注册 RegisterAdminRoutes 会让那批路由从完备性测试中彻底消失（既不被枚举、也就
+// 无从分类），reviewedDenyPrefixes 里的 "/api/v1/admin/payment" 会沦为一条谁也保护
+// 不了的死条目。任何新的 admin 路由组都必须在这里补注册。
 func newFullAdminRouter() *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	handlers := &handler.Handlers{Admin: &handler.AdminHandlers{}}
 	noop := func(c *gin.Context) { c.Next() }
+	v1 := router.Group("/api/v1")
 	RegisterAdminRoutes(
-		router.Group("/api/v1"),
+		v1,
 		handlers,
 		servermiddleware.AdminAuthMiddleware(noop),
 		servermiddleware.AuditLogMiddleware(noop),
 		servermiddleware.StepUpAuthMiddleware(noop),
+		nil,
+		nil,
+	)
+	RegisterPaymentRoutes(
+		v1,
+		nil,
+		nil,
+		nil,
+		servermiddleware.JWTAuthMiddleware(noop),
+		servermiddleware.AdminAuthMiddleware(noop),
+		servermiddleware.AuditLogMiddleware(noop),
 		nil,
 		nil,
 	)
@@ -345,4 +369,156 @@ func TestReadonlyAdminDenyExactStaysInsidePartialModules(t *testing.T) {
 			"reviewedDenyExact 中的 %q 不属于任何部分放行模块 %v。\n"+
 				"整体拒绝的模块请登记到 reviewedDenyPrefixes。", key, partiallyAllowedModuleRoots)
 	}
+}
+
+// newAdminRouterWithRole 构造与生产环境同构的完整管理端路由，并让 adminAuth 桩件把
+// 指定角色写入 context —— 即"已通过管理端认证的某角色用户"。
+//
+// 处理器桩件是零值的 handler.Handlers，真正被放行的请求会在处理器内部因空指针 panic。
+// 这里用引擎级中间件把 panic 收敛成 599，从而把"是否被守卫拦下"与"是否走到了处理器"
+// 区分开：403 = 被守卫拒绝；其余任何状态 = 已越过守卫。
+func newAdminRouterWithRole(role string) *gin.Engine {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		defer func() {
+			if r := recover(); r != nil {
+				c.AbortWithStatus(599) // 走到了处理器（桩件为 nil，必然 panic）
+			}
+		}()
+		c.Next()
+	})
+	handlers := &handler.Handlers{Admin: &handler.AdminHandlers{}}
+	setRole := func(c *gin.Context) {
+		c.Set(string(servermiddleware.ContextKeyUserRole), role)
+		c.Next()
+	}
+	noop := func(c *gin.Context) { c.Next() }
+	v1 := router.Group("/api/v1")
+	RegisterAdminRoutes(
+		v1,
+		handlers,
+		servermiddleware.AdminAuthMiddleware(setRole),
+		servermiddleware.AuditLogMiddleware(noop),
+		servermiddleware.StepUpAuthMiddleware(noop),
+		nil,
+		nil,
+	)
+	RegisterPaymentRoutes(
+		v1, nil, nil, nil,
+		servermiddleware.JWTAuthMiddleware(noop),
+		servermiddleware.AdminAuthMiddleware(setRole),
+		servermiddleware.AuditLogMiddleware(noop),
+		nil, nil,
+	)
+	return router
+}
+
+func statusFor(t *testing.T, router *gin.Engine, method, path string) int {
+	t.Helper()
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, httptest.NewRequest(method, path, nil))
+	return recorder.Code
+}
+
+// TestReadonlyAdminGuardIsMounted 断言守卫【确实挂在了路由链上】。
+//
+// 其余测试全部只读白名单这张数据表：哪怕有人把 admin.go 里的
+// admin.Use(middleware.ReadonlyAdminGuard()) 整行删掉，它们依然全绿。而 admin.go /
+// payment.go 都是上游合并的高冲突文件，这一行被合并冲突吃掉是很现实的失效模式。
+// 本测试跑的是真实中间件链，删掉挂载点它立刻红。
+func TestReadonlyAdminGuardIsMounted(t *testing.T) {
+	readonly := newAdminRouterWithRole(service.RoleReadonlyAdmin)
+
+	// 白名单外的写端点：必须被守卫拦下。
+	require.Equal(t, http.StatusForbidden,
+		statusFor(t, readonly, http.MethodDelete, "/api/v1/admin/accounts/1"),
+		"DELETE /admin/accounts/:id 未被拦截 —— ReadonlyAdminGuard 可能没有挂载到 admin 路由链上")
+
+	// 白名单内的读端点：必须放行（放行后会撞上 nil 处理器，状态非 403 即可）。
+	require.NotEqual(t, http.StatusForbidden,
+		statusFor(t, readonly, http.MethodGet, "/api/v1/admin/accounts"),
+		"GET /admin/accounts 被拦截了 —— 白名单未生效")
+
+	// 换成普通管理员：同一条写端点不应被拦（守卫只对 readonly_admin 生效）。
+	require.NotEqual(t, http.StatusForbidden,
+		statusFor(t, newAdminRouterWithRole(service.RoleAdmin), http.MethodDelete, "/api/v1/admin/accounts/1"),
+		"普通 admin 被 ReadonlyAdminGuard 误伤")
+}
+
+// TestReadonlyAdminGuardIsMountedOnPaymentRoutes 同上，针对 routes/payment.go 里
+// 那个独立的 v1.Group("/admin/payment")。它不经过 RegisterAdminRoutes，需要单独挂载，
+// 也就需要单独断言 —— 此前正是这里漏挂，导致只读账号可读取未脱敏的支付渠道配置、
+// 并能发起退款。
+func TestReadonlyAdminGuardIsMountedOnPaymentRoutes(t *testing.T) {
+	readonly := newAdminRouterWithRole(service.RoleReadonlyAdmin)
+	for _, tc := range []struct{ method, path string }{
+		{http.MethodGet, "/api/v1/admin/payment/config"}, // 未脱敏的支付渠道配置
+		{http.MethodPut, "/api/v1/admin/payment/config"}, // 写
+		{http.MethodGet, "/api/v1/admin/payment/orders"}, // 其他客户的订单
+		{http.MethodPost, "/api/v1/admin/payment/orders/1/refund"},
+		{http.MethodGet, "/api/v1/admin/payment/providers"}, // 渠道凭据
+	} {
+		require.Equalf(t, http.StatusForbidden, statusFor(t, readonly, tc.method, tc.path),
+			"%s %s 未被拦截 —— payment 管理端路由组缺少 ReadonlyAdminGuard", tc.method, tc.path)
+	}
+
+	require.NotEqual(t, http.StatusForbidden,
+		statusFor(t, newAdminRouterWithRole(service.RoleAdmin), http.MethodGet, "/api/v1/admin/payment/config"),
+		"普通 admin 被 ReadonlyAdminGuard 误伤")
+}
+
+// TestReadonlyAdminAllowlistDoesNotOverlapDenyPrefixes 锁定"整体拒绝的模块里没有放行项"
+// 这条不变量。
+//
+// 若某天有人往当前被整体拒绝的模块（如 proxies）里加了一条白名单端点，该模块就悄悄
+// 变成了"部分放行"，却仍以前缀形式登记在 reviewedDenyPrefixes 中 —— 于是模块内新增
+// 路由再次自动免于分类，正是已修复的那个 bug 从反方向复活。
+// 触发本测试时的正确做法：把该模块根加入 partiallyAllowedModuleRoots，从
+// reviewedDenyPrefixes 移除，并把模块内的拒绝项逐条写入 reviewedDenyExact。
+func TestReadonlyAdminAllowlistDoesNotOverlapDenyPrefixes(t *testing.T) {
+	for _, key := range servermiddleware.ReadonlyAdminAllowlistKeys() {
+		parts := strings.SplitN(key, " ", 2)
+		require.Lenf(t, parts, 2, "白名单条目格式应为 \"METHOD /path\"，实际为 %q", key)
+		for _, prefix := range reviewedDenyPrefixes {
+			require.Falsef(t, strings.HasPrefix(parts[1], prefix),
+				"白名单端点 %q 落在了整体拒绝前缀 %q 之下。\n"+
+					"该模块已变成『部分放行』，必须改用精确登记：把 %q 加入 partiallyAllowedModuleRoots，\n"+
+					"从 reviewedDenyPrefixes 移除，模块内的拒绝项逐条写入 reviewedDenyExact。",
+				key, prefix, prefix)
+		}
+	}
+}
+
+// TestReadonlyAdminDenyPrefixesAreAllLive 防止拒绝前缀变成"看着已审阅、实则谁也保护
+// 不了"的死条目。
+//
+// 一条匹配不到任何已注册路由的前缀有两种成因，都需要人处理：
+// (1) 模块已被删除或改名 —— 该条目应清理；
+// (2) 该模块的路由压根没被 newFullAdminRouter 枚举到 —— 说明它在某个独立的路由组里
+//
+//	注册（payment 就是这样），完备性测试对它完全失明，必须补注册。
+//
+// 成因 (2) 正是支付管理端漏挂守卫时的现场：/api/v1/admin/payment 当时匹配 0 条路由。
+func TestReadonlyAdminDenyPrefixesAreAllLive(t *testing.T) {
+	routes := newFullAdminRouter().Routes()
+	var dead []string
+	for _, prefix := range reviewedDenyPrefixes {
+		matched := false
+		for _, r := range routes {
+			if strings.HasPrefix(r.Path, prefix) {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			dead = append(dead, prefix)
+		}
+	}
+	sort.Strings(dead)
+	require.Emptyf(t, dead,
+		"以下 reviewedDenyPrefixes 条目匹配不到任何已注册路由：\n  %s\n"+
+			"要么该模块已删除/改名（清理掉），要么它的路由注册在独立的路由组里、\n"+
+			"newFullAdminRouter 没有枚举到（补注册，否则整个模块对本测试隐身）。",
+		strings.Join(dead, "\n  "))
 }
