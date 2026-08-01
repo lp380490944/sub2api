@@ -93,6 +93,7 @@
               </div>
             </div>
             <button
+              v-if="!isReadonlyAdmin"
               @click="openSortModal"
               class="btn btn-secondary"
               :title="t('admin.groups.sortOrder')"
@@ -101,6 +102,7 @@
               {{ t("admin.groups.sortOrder") }}
             </button>
             <button
+              v-if="!isReadonlyAdmin"
               @click="openCreateModal"
               class="btn btn-primary"
               data-tour="groups-create-btn"
@@ -367,6 +369,7 @@
                 <span class="text-xs">Dashboard</span>
               </router-link>
               <button
+                v-if="!isReadonlyAdmin"
                 @click="handleEdit(row)"
                 class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-primary-600 dark:hover:bg-dark-700 dark:hover:text-primary-400"
               >
@@ -374,6 +377,7 @@
                 <span class="text-xs">{{ t("common.edit") }}</span>
               </button>
               <button
+                v-if="!isReadonlyAdmin"
                 data-testid="group-duplicate"
                 :title="
                   duplicatingGroupIds.has(row.id)
@@ -394,7 +398,7 @@
                 </span>
               </button>
               <button
-                v-if="row.platform === 'composite'"
+                v-if="row.platform === 'composite' && !isReadonlyAdmin"
                 @click="handleCompositeRoutes(row)"
                 class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-cyan-600 dark:hover:bg-dark-700 dark:hover:text-cyan-400"
               >
@@ -404,6 +408,7 @@
                 }}</span>
               </button>
               <button
+                v-if="!isReadonlyAdmin"
                 @click="handleRateMultipliers(row)"
                 class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-purple-600 dark:hover:bg-dark-700 dark:hover:text-purple-400"
               >
@@ -413,6 +418,7 @@
                 }}</span>
               </button>
               <button
+                v-if="!isReadonlyAdmin"
                 @click="handleRPMOverrides(row)"
                 class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-orange-600 dark:hover:bg-dark-700 dark:hover:text-orange-400"
               >
@@ -422,6 +428,7 @@
                 }}</span>
               </button>
               <button
+                v-if="!isReadonlyAdmin"
                 @click="handleDelete(row)"
                 class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-400"
               >
@@ -435,7 +442,9 @@
             <EmptyState
               :title="t('admin.groups.noGroupsYet')"
               :description="t('admin.groups.createFirstGroup')"
-              :action-text="t('admin.groups.createGroup')"
+              :action-text="
+                isReadonlyAdmin ? undefined : t('admin.groups.createGroup')
+              "
               @action="openCreateModal"
             />
           </template>
@@ -4334,6 +4343,7 @@ import { ref, reactive, computed, onMounted, onUnmounted, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useAppStore } from "@/stores/app";
 import { useOnboardingStore } from "@/stores/onboarding";
+import { useAuthStore } from "@/stores/auth";
 import { adminAPI } from "@/api/admin";
 import type {
   AdminGroup,
@@ -4404,6 +4414,8 @@ import {
 const { t } = useI18n();
 const appStore = useAppStore();
 const onboardingStore = useOnboardingStore();
+const authStore = useAuthStore();
+const isReadonlyAdmin = computed(() => authStore.isReadonlyAdmin);
 
 const ALWAYS_VISIBLE_COLUMNS = new Set(["name", "actions"]);
 // Default hidden columns (hidden on first load / after schema bumps).
