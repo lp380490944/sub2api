@@ -14,6 +14,9 @@ const (
 const (
 	RoleAdmin = "admin"
 	RoleUser  = "user"
+	// RoleReadonlyAdmin 只读管理员：可进入管理后台的受限模块，不可执行任何写操作。
+	// 授权由 middleware.ReadonlyAdminGuard 的白名单强制，默认拒绝。
+	RoleReadonlyAdmin = "readonly_admin"
 )
 
 // Platform constants
