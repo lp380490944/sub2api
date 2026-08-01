@@ -33,7 +33,17 @@ vi.mock('@/api/admin', () => ({
       batchClearError: vi.fn(),
       batchRefresh: vi.fn(),
       probeUpstreamBillingBatch: vi.fn(),
-      toggleSchedulable: vi.fn()
+      toggleSchedulable: vi.fn(),
+      getTempUnschedulableStatus: vi.fn().mockResolvedValue({
+        active: true,
+        state: {
+          rule_index: 0,
+          triggered_at_unix: Math.floor(Date.now() / 1000) - 60,
+          until_unix: Math.floor(Date.now() / 1000) + 3600,
+          error_message: 'test error'
+        }
+      }),
+      recoverState: vi.fn()
     },
     proxies: {
       getAll: getAllProxies
@@ -81,6 +91,15 @@ const DataTableStub = {
       </div>
     </div>
   `
+}
+
+// Mirrors AccountStatusIndicator's real event contract (@show-temp-unsched)
+// without pulling in its own status-badge logic, so the test can open
+// TempUnschedStatusModal the same way the real component does.
+const AccountStatusIndicatorStub = {
+  props: ['account'],
+  emits: ['show-temp-unsched'],
+  template: `<button data-test="open-temp-unsched" @click="$emit('show-temp-unsched', account)">status</button>`
 }
 
 const baseStubs = {
@@ -213,5 +232,112 @@ describe('admin AccountsView readonly admin controls', () => {
     const deleteButton = actionsRow.findAll('button').find(btn => btn.text() === 'common.delete')
     expect(editButton).toBeDefined()
     expect(deleteButton).toBeDefined()
+  })
+})
+
+// Regression coverage for the "child declares/uses a readonly prop but the
+// parent forgets to pass it" failure mode: TempUnschedStatusModal only
+// gates its own "Recover State" button on a `readonlyAdmin` prop -- if
+// AccountsView ever stops forwarding `:readonly-admin="isReadonlyAdmin"` at
+// its single call site, this must fail. TempUnschedStatusModal is
+// deliberately left unstubbed here (unlike baseStubs) so the real
+// parent-to-child prop binding is exercised, not a generic stub.
+// DataTableStub above only forwards the cell-select/cell-created_at/cell-actions
+// slots; this variant also forwards cell-status, since that's where
+// AccountStatusIndicator (and its @show-temp-unsched trigger) actually lives.
+const DataTableStubWithStatusCell = {
+  props: ['columns', 'data'],
+  template: `
+    <div data-test="data-table">
+      <div v-for="row in data" :key="row.id">
+        <slot name="cell-status" :row="row" />
+      </div>
+    </div>
+  `
+}
+
+describe('admin AccountsView TempUnschedStatusModal prop forwarding', () => {
+  // Same as baseStubs except TempUnschedStatusModal is intentionally omitted
+  // (left as the real component), AccountStatusIndicator is replaced with a
+  // stub that exposes the real @show-temp-unsched event contract, and
+  // DataTable is swapped for a variant that renders the cell-status slot.
+  const { TempUnschedStatusModal: _omitted, ...baseStubsWithoutTempUnsched } = baseStubs
+  const stubsWithRealTempUnschedModal = {
+    ...baseStubsWithoutTempUnsched,
+    DataTable: DataTableStubWithStatusCell,
+    AccountStatusIndicator: AccountStatusIndicatorStub,
+    // BaseDialog teleports to <body>; render inline instead of stubbing it
+    // away, so the real modal's footer button is reachable via wrapper queries.
+    Teleport: { template: '<div><slot /></div>' }
+  }
+
+  beforeEach(() => {
+    localStorage.clear()
+
+    listAccounts.mockReset()
+    listWithEtag.mockReset()
+    getBatchTodayStats.mockReset()
+    getUpstreamBillingProbeSettings.mockReset()
+    getAllProxies.mockReset()
+    getAllGroups.mockReset()
+    authStoreMock.mockReset()
+
+    listAccounts.mockResolvedValue({
+      items: [
+        {
+          id: 1,
+          name: 'test-account',
+          platform: 'anthropic',
+          type: 'oauth',
+          status: 'active',
+          schedulable: true,
+          created_at: '2026-03-07T10:00:00Z',
+          updated_at: '2026-03-07T10:00:00Z'
+        }
+      ],
+      total: 1,
+      page: 1,
+      page_size: 20,
+      pages: 1
+    })
+    listWithEtag.mockResolvedValue({ notModified: true, etag: null, data: null })
+    getBatchTodayStats.mockResolvedValue({ stats: {} })
+    getUpstreamBillingProbeSettings.mockResolvedValue({ enabled: true, interval_minutes: 30 })
+    getAllProxies.mockResolvedValue([])
+    getAllGroups.mockResolvedValue([])
+  })
+
+  it('hides the recover-state button inside the real modal for a readonly admin', async () => {
+    authStoreMock.mockReturnValue({ isReadonlyAdmin: true, isSimpleMode: false, token: 'test-token' })
+
+    const wrapper = mount(AccountsView, {
+      global: { stubs: stubsWithRealTempUnschedModal }
+    })
+    await flushPromises()
+
+    await wrapper.get('[data-test="open-temp-unsched"]').trigger('click')
+    await flushPromises()
+
+    const recoverButton = wrapper
+      .findAll('button')
+      .find((btn) => btn.text().includes('admin.accounts.recoverState'))
+    expect(recoverButton).toBeUndefined()
+  })
+
+  it('shows the recover-state button inside the real modal for a non-readonly admin', async () => {
+    authStoreMock.mockReturnValue({ isReadonlyAdmin: false, isSimpleMode: false, token: 'test-token' })
+
+    const wrapper = mount(AccountsView, {
+      global: { stubs: stubsWithRealTempUnschedModal }
+    })
+    await flushPromises()
+
+    await wrapper.get('[data-test="open-temp-unsched"]').trigger('click')
+    await flushPromises()
+
+    const recoverButton = wrapper
+      .findAll('button')
+      .find((btn) => btn.text().includes('admin.accounts.recoverState'))
+    expect(recoverButton).toBeDefined()
   })
 })
