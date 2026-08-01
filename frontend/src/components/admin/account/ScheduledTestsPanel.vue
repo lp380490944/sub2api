@@ -12,6 +12,7 @@
           {{ t('admin.scheduledTests.title') }}
         </p>
         <button
+          v-if="!readonlyAdmin"
           @click="showAddForm = !showAddForm"
           class="btn btn-primary flex items-center gap-1.5 text-sm"
         >
@@ -22,7 +23,7 @@
 
       <!-- Add Plan Form -->
       <div
-        v-if="showAddForm"
+        v-if="showAddForm && !readonlyAdmin"
         class="rounded-xl border border-primary-200 bg-primary-50/50 p-4 dark:border-primary-800 dark:bg-primary-900/20"
       >
         <div class="mb-3 text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -167,7 +168,7 @@
               </div>
 
               <!-- Enabled Toggle -->
-              <div class="flex items-center gap-1.5" @click.stop>
+              <div v-if="!readonlyAdmin" class="flex items-center gap-1.5" @click.stop>
                 <Toggle
                   :model-value="plan.enabled"
                   @update:model-value="(val: boolean) => handleToggleEnabled(plan, val)"
@@ -176,6 +177,9 @@
                   {{ plan.enabled ? t('admin.scheduledTests.enabled') : '' }}
                 </span>
               </div>
+              <span v-else class="text-xs text-gray-500 dark:text-gray-400">
+                {{ plan.enabled ? t('admin.scheduledTests.enabled') : '' }}
+              </span>
 
               <!-- Auto Recover Badge -->
               <span
@@ -200,7 +204,7 @@
               </div>
 
               <!-- Actions -->
-              <div class="flex items-center gap-1" @click.stop>
+              <div v-if="!readonlyAdmin" class="flex items-center gap-1" @click.stop>
                 <button
                   @click="startEdit(plan)"
                   class="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-blue-50 hover:text-blue-500 dark:hover:bg-blue-900/20"
@@ -231,7 +235,7 @@
 
           <!-- Edit Form -->
           <div
-            v-if="editingPlanId === plan.id"
+            v-if="editingPlanId === plan.id && !readonlyAdmin"
             class="border-t border-blue-100 bg-blue-50/50 px-4 py-3 dark:border-blue-900 dark:bg-blue-900/10"
             @click.stop
           >
@@ -484,6 +488,7 @@ const props = defineProps<{
   show: boolean
   accountId: number | null
   modelOptions: SelectOption[]
+  readonlyAdmin?: boolean
 }>()
 
 const emit = defineEmits<{

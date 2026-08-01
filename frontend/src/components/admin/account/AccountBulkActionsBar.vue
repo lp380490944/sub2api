@@ -23,7 +23,7 @@
       </button>
       </template>
     </div>
-    <div class="flex gap-2">
+    <div v-if="!readonlyAdmin" class="flex gap-2">
       <template v-if="selectedIds.length > 0">
         <button @click="$emit('delete')" class="btn btn-danger btn-sm">{{ t('admin.accounts.bulkActions.delete') }}</button>
         <button @click="$emit('reset-status')" class="btn btn-secondary btn-sm">{{ t('admin.accounts.bulkActions.resetStatus') }}</button>
@@ -43,7 +43,7 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 
-defineProps<{ selectedIds: number[] }>()
+defineProps<{ selectedIds: number[]; readonlyAdmin?: boolean }>()
 defineEmits([
   'delete',
   'edit-selected',

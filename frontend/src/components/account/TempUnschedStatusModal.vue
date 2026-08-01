@@ -121,6 +121,7 @@
           {{ t('common.close') }}
         </button>
         <button
+          v-if="!readonlyAdmin"
           type="button"
           class="btn btn-primary"
           :disabled="!isActive || resetting"
@@ -165,6 +166,7 @@ import { formatDateTime } from '@/utils/format'
 const props = defineProps<{
   show: boolean
   account: Account | null
+  readonlyAdmin?: boolean
 }>()
 
 const emit = defineEmits<{
