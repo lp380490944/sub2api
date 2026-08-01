@@ -149,6 +149,12 @@ func (h *UserHandler) List(c *gin.Context) {
 		filters.IncludeSubscriptions = &includeSubscriptions
 	}
 
+	// readonly_admin 的用户视图硬性裁剪为自身那条。
+	// 放在所有查询参数解析之后，无条件覆盖，使任何 query 都无法放宽范围。
+	if role, ok := middleware.GetUserRoleFromContext(c); ok && role == service.RoleReadonlyAdmin {
+		filters.RestrictToUserID = getAdminIDFromContext(c)
+	}
+
 	users, total, err := h.adminService.ListUsers(c.Request.Context(), page, pageSize, filters, sortBy, sortOrder)
 	if err != nil {
 		response.ErrorFrom(c, err)
@@ -212,6 +218,14 @@ func (h *UserHandler) GetByID(c *gin.Context) {
 	if err != nil {
 		response.BadRequest(c, "Invalid user ID")
 		return
+	}
+
+	// readonly_admin 只能查看自身。返回 404 而非 403：403 会泄露该 ID 是否存在。
+	if role, ok := middleware.GetUserRoleFromContext(c); ok && role == service.RoleReadonlyAdmin {
+		if userID != getAdminIDFromContext(c) {
+			response.NotFound(c, "User not found")
+			return
+		}
 	}
 
 	var user *service.User
