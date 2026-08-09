@@ -30,7 +30,7 @@ test('parseJsonLd throws clear error on bad JSON', () => {
 
 test('serializeJsonLd produces 2-space indented JSON', () => {
   const out = serializeJsonLd({ '@type': 'X', name: 'y' });
-  assert.match(out, /^{\n  "@type": "X",\n  "name": "y"\n}$/);
+  assert.match(out, /^{\n {2}"@type": "X",\n {2}"name": "y"\n}$/);
 });
 
 test('round-trip preserves data', () => {
