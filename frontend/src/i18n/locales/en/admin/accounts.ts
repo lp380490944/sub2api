@@ -323,6 +323,7 @@ export default {
         errorCodePlaceholder: 'e.g. 429',
         durationMinutes: 'Duration (minutes)',
         durationPlaceholder: 'e.g. 30',
+        durationMinutesHint: 'Enable switch only: the rule is armed when this is &gt; 0. The actual cooldown follows the backoff sequence (1/5/15/30/60 minutes, escalating on repeat strikes, reset after 5 minutes of recovery) — the number entered here is not used as the duration.',
         keywords: 'Keywords',
         keywordsPlaceholder: 'e.g. overloaded, too many requests',
         keywordsHint: 'Separate keywords with commas; any keyword match will trigger.',

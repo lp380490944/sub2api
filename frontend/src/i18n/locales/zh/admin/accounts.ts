@@ -373,6 +373,7 @@ export default {
         errorCodePlaceholder: '例如 429',
         durationMinutes: '持续时间（分钟）',
         durationPlaceholder: '例如 30',
+        durationMinutesHint: '仅作启用开关：填 &gt; 0 该规则才生效。实际冷却时长由退避序列决定（1/5/15/30/60 分钟，连续命中逐级递增，恢复满 5 分钟后重置），不取此处填写的数值。',
         keywords: '关键词',
         keywordsPlaceholder: '例如 overloaded, too many requests',
         keywordsHint: '多个关键词用逗号分隔，匹配时必须命中其中之一。',

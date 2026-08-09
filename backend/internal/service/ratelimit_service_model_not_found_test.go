@@ -116,7 +116,10 @@ func TestRateLimitService_HandleUpstreamError_Bare404UsesModelScopedTempUnschedu
 	call := repo.modelRateLimitCalls[0]
 	require.Equal(t, account.ID, call.accountID)
 	require.Equal(t, "gpt-5.4", call.scope)
-	require.WithinDuration(t, time.Now().Add(10*time.Minute), call.resetAt, 5*time.Second)
+	// NOTE(fork): 冷却时长由 tempUnschedBackoffSequence 决定（首次 1 分钟），
+	// 不取规则里的 duration_minutes（该字段在本 fork 只作启用开关，见
+	// temp_unsched_backoff.go 顶部说明）。上游此处期望规则时长 10 分钟。
+	require.WithinDuration(t, time.Now().Add(1*time.Minute), call.resetAt, 5*time.Second)
 
 	var state TempUnschedState
 	require.NoError(t, json.Unmarshal([]byte(call.reason), &state))

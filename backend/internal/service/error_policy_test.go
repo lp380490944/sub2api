@@ -572,6 +572,12 @@ type errorPolicyRepoStub struct {
 	modelRateLimitCalls []modelNotFoundRateLimitCall
 }
 
+// NOTE(fork): 账号级临时不可调度在本 fork 走 SetTempUnschedulableWithStep
+// （指数退避）。上游 stub 只桩了 SetTempUnschedulable，命中会被静默少计。
+func (r *errorPolicyRepoStub) SetTempUnschedulableWithStep(ctx context.Context, id int64, until time.Time, reason string, step int) error {
+	return r.SetTempUnschedulable(ctx, id, until, reason)
+}
+
 func (r *errorPolicyRepoStub) SetTempUnschedulable(ctx context.Context, id int64, until time.Time, reason string) error {
 	r.tempCalls++
 	return nil
