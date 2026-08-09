@@ -39,6 +39,7 @@ var reviewedDenyPrefixes = []string{
 	"/api/v1/admin/affiliates",
 	"/api/v1/admin/channel-monitors",
 	"/api/v1/admin/channel-monitor-templates",
+	"/api/v1/admin/channel-monitor-v2",
 	"/api/v1/admin/openai",
 	"/api/v1/admin/gemini",
 	"/api/v1/admin/antigravity",
@@ -82,7 +83,12 @@ var partiallyAllowedModuleRoots = []string{
 var reviewedDenyExact = map[string]struct{}{
 	// ---- accounts（51 条）----
 	// 上游账号：写操作 / 凭据导出导入 / 触发上游调用
-	"POST /api/v1/admin/accounts":                                    {},
+	"POST /api/v1/admin/accounts": {},
+	// 批量删除账号：破坏性写操作。
+	"POST /api/v1/admin/accounts/batch-delete": {},
+	// force=true 会绕过缓存对上游发起真实用量查询（可放大外呼），只读管理员
+	// 已有 GET /accounts/:id/usage 与 today-stats/batch 覆盖读取需求。
+	"POST /api/v1/admin/accounts/usage/batch":                        {},
 	"PUT /api/v1/admin/accounts/:id":                                 {},
 	"DELETE /api/v1/admin/accounts/:id":                              {},
 	"POST /api/v1/admin/accounts/:id/apply-oauth-credentials":        {},

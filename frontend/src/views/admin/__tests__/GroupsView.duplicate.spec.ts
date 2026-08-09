@@ -11,6 +11,7 @@ const {
   getModelsListCandidates,
   getUsageSummary,
   getCapacitySummary,
+  getLiveCapability,
   showSuccess,
   showError
 } = vi.hoisted(() => ({
@@ -19,6 +20,7 @@ const {
   getModelsListCandidates: vi.fn(),
   getUsageSummary: vi.fn(),
   getCapacitySummary: vi.fn(),
+  getLiveCapability: vi.fn(),
   showSuccess: vi.fn(),
   showError: vi.fn()
 }))
@@ -31,14 +33,12 @@ vi.mock('@/api/admin', () => ({
       getModelsListCandidates,
       getUsageSummary,
       getCapacitySummary,
+      getLiveCapability,
       getAll: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
-      updateSortOrder: vi.fn(),
-      // GroupsView 挂载时会调用；上游此 spec 漏了它，导致未捕获错误
-      // 泄漏并污染同批次其它用例。
-      getLiveCapability: vi.fn().mockResolvedValue({ supported: false })
+      updateSortOrder: vi.fn()
     },
     accounts: {
       list: vi.fn(),
@@ -175,11 +175,16 @@ describe('GroupsView duplicate action', () => {
       getModelsListCandidates,
       getUsageSummary,
       getCapacitySummary,
+      getLiveCapability,
       showSuccess,
       showError
     ]) {
       fn.mockReset()
     }
+
+    // GroupsView 挂载时会调用；mockReset 会清掉声明处的返回值，必须在此重设，
+    // 否则 promise 为 undefined，未捕获拒绝会污染同批次其它用例。
+    getLiveCapability.mockResolvedValue({ supported: false })
 
     listGroups.mockResolvedValue({
       items: [sourceGroup],
@@ -197,6 +202,7 @@ describe('GroupsView duplicate action', () => {
     getModelsListCandidates.mockResolvedValue([])
     getUsageSummary.mockResolvedValue([])
     getCapacitySummary.mockResolvedValue([])
+    getLiveCapability.mockResolvedValue({ supported: false })
   })
 
   afterEach(() => {
