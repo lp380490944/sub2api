@@ -32,6 +32,14 @@ func (r *modelNotFoundAccountRepoStub) SetTempUnschedulable(ctx context.Context,
 	return nil
 }
 
+// NOTE(fork): 本 fork 的 401/账号级路径走 SetTempUnschedulableWithStep（指数退避），
+// 不再调用上游的 SetTempUnschedulable。上游用例只桩了后者，导致账号级命中被计为 0。
+// 两者都计入 tempCalls，用例才真正覆盖到账号级分支。
+func (r *modelNotFoundAccountRepoStub) SetTempUnschedulableWithStep(ctx context.Context, id int64, until time.Time, reason string, step int) error {
+	r.tempCalls++
+	return nil
+}
+
 func (r *modelNotFoundAccountRepoStub) SetModelRateLimit(ctx context.Context, id int64, scope string, resetAt time.Time, reason ...string) error {
 	call := modelNotFoundRateLimitCall{
 		accountID: id,
