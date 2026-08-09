@@ -2645,6 +2645,26 @@ func setEnvReachableDefaults() {
 	viper.SetDefault("gateway.user_message_queue.mode", "")
 	viper.SetDefault("update.proxy_url", "")
 
+	// Fork-only P0-1/P0-2/P0-3 gateway knobs and the response cache. These had
+	// no registered default, so viper.AllKeys() never listed them and
+	// viper.Unmarshal silently discarded their environment variables — the
+	// operator sets GATEWAY_LTB_TTL_DAYS and nothing happens. Their effective
+	// defaults live downstream (setting_parse.go seeds the DB-backed settings
+	// via nonNegativeInt), so a zero-valued default here is behaviour-neutral
+	// and only restores env reachability.
+	viper.SetDefault("gateway.ltb_ttl_days", 0)
+	viper.SetDefault("gateway.ltb_cleanup_interval_seconds", 0)
+	viper.SetDefault("gateway.session_account_fanout_limit", 0)
+	viper.SetDefault("gateway.session_account_fanout_window_sec", 0)
+	viper.SetDefault("gateway.bound_session_switch_jitter_min_ms", 0)
+	viper.SetDefault("gateway.bound_session_switch_jitter_max_ms", 0)
+	viper.SetDefault("gateway.identity_profile_inject_enabled", false)
+	viper.SetDefault("gateway.identity_profile_rotation_days", 0)
+	viper.SetDefault("gateway.response_cache.enabled", false)
+	viper.SetDefault("gateway.response_cache.max_size_mb", 0)
+	viper.SetDefault("gateway.response_cache.ttl_minutes", 0)
+	viper.SetDefault("rate_limit.extra_usage_cooldown_minutes", 0)
+
 	// sticky_escape_enabled is the one exception to the zero-value rule: its
 	// effective default is true, applied post-unmarshal via a viper.IsSet guard.
 	// Registering false would make IsSet always report true and permanently
