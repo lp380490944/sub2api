@@ -436,6 +436,58 @@ func TestRateLimitService_HandleUpstreamError_CodexPlanGatedTextModelStillCoolsD
 	require.Equal(t, upstreamCodexPlanGatedModelReason, repo.modelRateLimitCalls[0].reason)
 }
 
+// Claude Platform on AWS / Bedrock Mantle 对 key 无权调用的模型回 400
+// {"message":"Operation not allowed"}：与 model-identifier-invalid 同性质
+// （对该 region 永久成立），必须冷却该 (账号, 模型) 并让本次请求切到别的区域账号。
+func TestRateLimitService_HandleUpstreamError_BedrockOperationNotAllowedUsesModelRateLimit(t *testing.T) {
+	repo := &modelNotFoundAccountRepoStub{}
+	svc := &RateLimitService{accountRepo: repo}
+	account := &Account{
+		ID:          303,
+		Platform:    PlatformAnthropic,
+		Type:        AccountTypeBedrock,
+		Status:      StatusActive,
+		Schedulable: true,
+		Credentials: map[string]any{},
+	}
+
+	handled := svc.HandleUpstreamError(
+		context.Background(),
+		account,
+		http.StatusBadRequest,
+		http.Header{},
+		[]byte(`{"message": "Operation not allowed"}`),
+		"claude-sonnet-4-6",
+	)
+
+	require.True(t, handled, "必须返回 true，调用方据此切到下一个账号")
+	require.Zero(t, repo.tempCalls)
+	require.Len(t, repo.modelRateLimitCalls, 1)
+	call := repo.modelRateLimitCalls[0]
+	require.Equal(t, "claude-sonnet-4-6", call.scope)
+	require.Equal(t, "upstream_400_bedrock_operation_not_allowed", call.reason)
+	require.WithinDuration(t, time.Now().Add(upstreamModelNotFoundCooldown), call.resetAt, 5*time.Second)
+}
+
+// 同一句文案来自非 AWS 账号（第三方中转）时语义不确定，不得冷却，避免误伤。
+func TestRateLimitService_HandleUpstreamError_OperationNotAllowedIgnoredForNonAWSAccount(t *testing.T) {
+	repo := &modelNotFoundAccountRepoStub{}
+	svc := &RateLimitService{accountRepo: repo}
+
+	handled := svc.HandleUpstreamError(
+		context.Background(),
+		openAIModelNotFoundTempAccount(),
+		http.StatusBadRequest,
+		http.Header{},
+		[]byte(`{"message": "Operation not allowed"}`),
+		"gpt-5.4",
+	)
+
+	require.False(t, handled)
+	require.Zero(t, repo.tempCalls)
+	require.Empty(t, repo.modelRateLimitCalls)
+}
+
 func openAICodexPlanGatedOAuthAccount() *Account {
 	return &Account{
 		ID:          202,
