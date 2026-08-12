@@ -185,6 +185,7 @@ func (s *OpenAIGatewayService) ForwardAsAnthropic(
 		codexResult := applyCodexOAuthTransformWithOptions(reqBody, codexOAuthTransformOptions{
 			SkipDefaultInstructions: true,
 			PreserveToolCallIDs:     true,
+			StripReasoningContent:   account.Platform == PlatformOpenAI && !account.IsOpenAIPassthroughEnabled(),
 		})
 		forcedTemplateText := ""
 		if s.cfg != nil {
