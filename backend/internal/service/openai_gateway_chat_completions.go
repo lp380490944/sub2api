@@ -251,6 +251,7 @@ func (s *OpenAIGatewayService) ForwardAsChatCompletions(
 		codexResult := applyCodexOAuthTransformWithOptions(reqBody, codexOAuthTransformOptions{
 			SkipDefaultInstructions:             !isResponsesShape,
 			OmitPromotedSystemMessagesFromInput: !isResponsesShape && !isJSONObjectFormat,
+			StripReasoningContent:               account.Platform == PlatformOpenAI && !account.IsOpenAIPassthroughEnabled(),
 		})
 		if codexResult.Error != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"type": "invalid_request_error", "message": codexResult.Error.Error()}})

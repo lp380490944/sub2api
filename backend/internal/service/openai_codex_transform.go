@@ -86,6 +86,13 @@ type codexOAuthTransformOptions struct {
 	SkipDefaultInstructions             bool
 	PreserveToolCallIDs                 bool
 	OmitPromotedSystemMessagesFromInput bool
+	// StripReasoningContent 剥离 reasoning 项上的 content 字段。仅对官方
+	// OpenAI Codex(OAuth, 非透传中转) 开启：官方 Responses API 要求 reasoning
+	// 的 content 为空数组, 收到非空即回 400 array_above_max_length。第三方
+	// Responses 兼容提供方(如 DeepSeek)会写入 content:[{reasoning_text}],
+	// Codex 将其持久化到 rollout-*.jsonl 后回放即失败。encrypted_content 才是
+	// 官方跨轮推理载体, 不受影响。参见 Wei-Shaw/sub2api#5178。
+	StripReasoningContent bool
 }
 
 const (
@@ -317,8 +324,9 @@ func applyCodexOAuthTransformWithOptions(reqBody map[string]any, opts codexOAuth
 			result.Modified = true
 		}
 		input = filterCodexInputWithOptions(input, codexInputFilterOptions{
-			PreserveReferences: needsToolContinuation,
-			PreserveCallIDs:    opts.PreserveToolCallIDs,
+			PreserveReferences:    needsToolContinuation,
+			PreserveCallIDs:       opts.PreserveToolCallIDs,
+			StripReasoningContent: opts.StripReasoningContent,
 		})
 		reqBody["input"] = input
 		result.Modified = true
@@ -1498,8 +1506,9 @@ func isInstructionsEmpty(reqBody map[string]any) bool {
 }
 
 type codexInputFilterOptions struct {
-	PreserveReferences bool
-	PreserveCallIDs    bool
+	PreserveReferences    bool
+	PreserveCallIDs       bool
+	StripReasoningContent bool
 }
 
 // filterCodexInput 按需过滤 item_reference 与 id。
@@ -1615,6 +1624,11 @@ func filterCodexInputWithOptions(input []any, opts codexInputFilterOptions) []an
 			for key, value := range m {
 				if key == "id" || key == "call_id" {
 					// rs_* id replayed under store=false 404s; strip it.
+					continue
+				}
+				if key == "content" && opts.StripReasoningContent {
+					// 官方 Responses API 要求 reasoning.content 为空数组;
+					// 第三方提供方写入的 reasoning_text 会被 400 拒绝。
 					continue
 				}
 				newItem[key] = value
