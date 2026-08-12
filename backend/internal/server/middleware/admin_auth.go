@@ -197,8 +197,9 @@ func validateJWTForAdmin(
 		return false
 	}
 
-	// 检查管理员权限
-	if !user.IsAdmin() {
+	// 检查管理面板准入权限（admin 或 readonly_admin）
+	// 具体能访问哪些端点由 ReadonlyAdminGuard 白名单决定
+	if !user.CanAccessAdminPanel() {
 		AbortWithError(c, 403, "FORBIDDEN", "Admin access required")
 		return false
 	}

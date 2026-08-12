@@ -14,6 +14,8 @@ const authStore = vi.hoisted(() => ({
   checkAuth: vi.fn(),
   isAuthenticated: true,
   isAdmin: false,
+  isReadonlyAdmin: false,
+  canAccessAdminPanel: false,
   isSimpleMode: false,
   hasPendingAuthSession: false,
 }))
@@ -113,7 +115,10 @@ describe('feature route guard', () => {
   beforeEach(() => {
     authStore.isAuthenticated = true
     authStore.isAdmin = false
+    authStore.isReadonlyAdmin = false
+    authStore.canAccessAdminPanel = false
     authStore.isSimpleMode = false
+    appStore.backendModeEnabled = false
     appStore.publicSettingsLoaded = false
     appStore.cachedPublicSettings = null
     appStore.fetchPublicSettings.mockReset()
@@ -173,5 +178,82 @@ describe('feature route guard', () => {
     expect(appStore.fetchPublicSettings).not.toHaveBeenCalled()
     expect(next).toHaveBeenCalledOnce()
     expect(next).toHaveBeenCalledWith(target)
+  })
+
+  describe('backend mode admin panel access', () => {
+    // readonly_admin is NOT supported in backend mode: the backend auth handlers
+    // (backend/internal/handler/auth_handler.go Login/RefreshToken,
+    // backend/internal/handler/passkey_handler.go) gate backend-mode login/2FA/passkey
+    // and token refresh on user.IsAdmin() / UserRole=="admin", so the role can never
+    // actually establish or keep a session when backend mode is on. The router must
+    // fail closed here too — this is a regression test for the backend-mode gates in
+    // @/router staying on isAdmin, not canAccessAdminPanel.
+    it('blocks readonly_admin from a whitelisted admin page in backend mode, redirecting to /login', async () => {
+      authStore.isAdmin = false
+      authStore.isReadonlyAdmin = true
+      authStore.canAccessAdminPanel = true
+      appStore.backendModeEnabled = true
+
+      const { navigation, next } = runGuard({ requiresAdmin: true }, '/admin/accounts')
+      await navigation
+
+      expect(next).toHaveBeenCalledOnce()
+      expect(next).toHaveBeenCalledWith('/login')
+    })
+
+    it('still lets a real admin reach admin pages', async () => {
+      authStore.isAdmin = true
+      authStore.isReadonlyAdmin = false
+      authStore.canAccessAdminPanel = true
+      appStore.backendModeEnabled = true
+
+      const { navigation, next } = runGuard({ requiresAdmin: true }, '/admin/dashboard')
+      await navigation
+
+      expect(next).toHaveBeenCalledOnce()
+      expect(next).toHaveBeenCalledWith()
+    })
+
+    it('still blocks a plain user, redirecting to /login', async () => {
+      authStore.isAdmin = false
+      authStore.isReadonlyAdmin = false
+      authStore.canAccessAdminPanel = false
+      appStore.backendModeEnabled = true
+
+      const { navigation, next } = runGuard({}, '/dashboard')
+      await navigation
+
+      expect(next).toHaveBeenCalledOnce()
+      expect(next).toHaveBeenCalledWith('/login')
+    })
+
+    it('redirects readonly_admin off a non-whitelisted admin page to its home', async () => {
+      authStore.isAdmin = false
+      authStore.isReadonlyAdmin = true
+      authStore.canAccessAdminPanel = true
+      appStore.backendModeEnabled = false
+
+      const { navigation, next } = runGuard({ requiresAdmin: true }, '/admin/settings')
+      await navigation
+
+      expect(next).toHaveBeenCalledOnce()
+      expect(next).toHaveBeenCalledWith('/admin/accounts')
+    })
+
+    // Proves the revert above only removed backend-mode support and did not touch the
+    // general requiresAdmin admission gate: with backend mode OFF, readonly_admin must
+    // still reach a whitelisted admin page normally.
+    it('still lets readonly_admin reach a whitelisted admin page when backend mode is off', async () => {
+      authStore.isAdmin = false
+      authStore.isReadonlyAdmin = true
+      authStore.canAccessAdminPanel = true
+      appStore.backendModeEnabled = false
+
+      const { navigation, next } = runGuard({ requiresAdmin: true }, '/admin/accounts')
+      await navigation
+
+      expect(next).toHaveBeenCalledOnce()
+      expect(next).toHaveBeenCalledWith()
+    })
   })
 })

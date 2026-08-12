@@ -83,6 +83,13 @@ type UserListFilters struct {
 	// IncludeDeleted 为 true 时绕过软删除过滤，返回含已删除（deleted_at 非空）的用户。
 	// 仅供 /admin/usage 的 SearchUsers 端点使用，其他列表调用方不要设置。
 	IncludeDeleted bool
+	// RestrictToUserID 非 0 时把结果集硬性限制为该 ID 的单条用户，且不可被其他
+	// 过滤条件放宽（它是 AND 到查询上的，不是替换）。
+	//
+	// 仅由 readonly_admin 的准入路径设置（见 handler/admin/user_handler.go）。
+	// 这是一条安全边界，不要用 Search 字段代替 —— Search 是 email/username 上的
+	// 模糊匹配，会跨账号命中。
+	RestrictToUserID int64
 }
 
 // UserUpdateFields 声明 UserRepository.Update 允许写回的列。
@@ -180,6 +187,13 @@ type UserRepository interface {
 	UpdateTotpSecret(ctx context.Context, userID int64, encryptedSecret *string) error
 	EnableTotp(ctx context.Context, userID int64) error
 	DisableTotp(ctx context.Context, userID int64) error
+}
+
+// RegistrationEmailDomainRepository 是生产用户仓储为非白名单域名单账户兜底策略提供的可选能力。
+// 它独立于 UserRepository，避免无关测试桩和服务消费者实现注册专用方法。
+type RegistrationEmailDomainRepository interface {
+	CountUsersByEmailDomain(ctx context.Context, domain string) (int, error)
+	CreateWithEmailAliasGuardAndDomainLimit(ctx context.Context, user *User, domain string) error
 }
 
 // RedeemUserAdjustmentRepository provides the atomic, floor-at-zero updates

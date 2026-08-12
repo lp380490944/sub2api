@@ -10,6 +10,7 @@
       >
         {{ model }}
         <button
+          v-if="!props.disabled"
           type="button"
           @click="removeModel(idx)"
           class="ml-0.5 rounded-full p-0.5 hover:bg-primary-200 dark:hover:bg-primary-800"
@@ -21,6 +22,7 @@
         ref="inputRef"
         v-model="inputValue"
         type="text"
+        :disabled="props.disabled"
         class="flex-1 min-w-[120px] border-none bg-transparent text-sm outline-none placeholder:text-gray-400 dark:text-white"
         :placeholder="models.length === 0 ? placeholder : ''"
         @keydown.enter.prevent="addModel"
@@ -48,6 +50,7 @@ const props = defineProps<{
   models: string[]
   placeholder?: string
   platform?: string
+  disabled?: boolean
 }>()
 
 const emit = defineEmits<{

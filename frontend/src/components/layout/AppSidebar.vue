@@ -32,7 +32,7 @@
     <!-- Navigation -->
     <nav ref="sidebarNavRef" class="sidebar-nav scrollbar-hide">
       <!-- Admin View: Admin menu first, then personal menu -->
-      <template v-if="isAdmin">
+      <template v-if="canAccessAdminPanel">
         <!-- Admin Section -->
         <div class="sidebar-section">
           <template v-for="item in adminNavItems" :key="item.path">
@@ -197,6 +197,7 @@ import { sanitizeSvg } from '@/utils/sanitize'
 import { sanitizeUrl } from '@/utils/url'
 import { FeatureFlags, makeSidebarFlag } from '@/utils/featureFlags'
 import { useBatchImageAccess } from '@/composables/useBatchImageAccess'
+import { isReadonlyAdminPathAllowed, READONLY_ADMIN_HOME } from '@/router/readonlyAdminPaths'
 
 interface NavItem {
   path: string
@@ -247,10 +248,16 @@ const { canUseBatchImage, refreshBatchImageAccess } = useBatchImageAccess()
 const sidebarCollapsed = computed(() => appStore.sidebarCollapsed)
 const mobileOpen = computed(() => appStore.mobileOpen)
 const isAdmin = computed(() => authStore.isAdmin)
+const isReadonlyAdmin = computed(() => authStore.isReadonlyAdmin)
+const canAccessAdminPanel = computed(() => authStore.canAccessAdminPanel)
 const sidebarNavRef = ref<HTMLElement | null>(null)
 const isDark = ref(document.documentElement.classList.contains('dark'))
 
-const homePath = computed(() => (isAdmin.value ? '/admin/dashboard' : '/dashboard'))
+const homePath = computed(() => {
+  if (isAdmin.value) return '/admin/dashboard'
+  if (isReadonlyAdmin.value) return READONLY_ADMIN_HOME
+  return '/dashboard'
+})
 
 // Track which parent nav groups are expanded
 const expandedGroups = ref<Set<string>>(new Set())
@@ -818,6 +825,7 @@ const adminNavItems = computed((): NavItem[] => {
   const visible = applyFeatureFlags(baseItems)
 
   // 简单模式下，在系统设置前插入 API密钥
+  let result: NavItem[]
   if (authStore.isSimpleMode) {
     const filtered = visible.filter(item => !item.hideInSimpleMode)
     filtered.push({ path: '/keys', label: t('nav.apiKeys'), icon: KeyIcon })
@@ -825,14 +833,29 @@ const adminNavItems = computed((): NavItem[] => {
     for (const cm of customMenuItemsForAdmin.value) {
       filtered.push({ path: `/custom/${cm.id}`, label: cm.label, icon: null, iconSvg: cm.icon_svg })
     }
-    return filtered
+    result = filtered
+  } else {
+    visible.push({ path: '/admin/settings', label: t('nav.settings'), icon: CogIcon })
+    for (const cm of customMenuItemsForAdmin.value) {
+      visible.push({ path: `/custom/${cm.id}`, label: cm.label, icon: null, iconSvg: cm.icon_svg })
+    }
+    result = visible
   }
 
-  visible.push({ path: '/admin/settings', label: t('nav.settings'), icon: CogIcon })
-  for (const cm of customMenuItemsForAdmin.value) {
-    visible.push({ path: `/custom/${cm.id}`, label: cm.label, icon: null, iconSvg: cm.icon_svg })
+  // readonly_admin 只保留白名单内的菜单项，子菜单同样逐项过滤。这个过滤必须放在
+  // 两个分支（简单模式 / 完整模式）都已经把 /admin/settings 塞进去之后，否则
+  // settings 会在过滤后才被追加，泄漏进只读菜单。
+  if (isReadonlyAdmin.value) {
+    return result
+      .filter((item) => isReadonlyAdminPathAllowed(item.path))
+      .map((item) =>
+        item.children
+          ? { ...item, children: item.children.filter((c) => isReadonlyAdminPathAllowed(c.path)) }
+          : item
+      )
   }
-  return visible
+
+  return result
 })
 
 function toggleSidebar() {

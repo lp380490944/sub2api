@@ -43,6 +43,14 @@ const fakeAdminUser = {
   role: 'admin' as const,
 }
 
+const fakeReadonlyAdminUser = {
+  ...fakeUser,
+  id: 3,
+  username: 'readonly-admin',
+  email: 'readonly-admin@example.com',
+  role: 'readonly_admin' as const,
+}
+
 const fakeAuthResponse = {
   access_token: 'test-token-123',
   refresh_token: 'refresh-token-456',
@@ -339,6 +347,35 @@ describe('useAuthStore', () => {
     it('未登录时返回 false', () => {
       const store = useAuthStore()
       expect(store.isAdmin).toBe(false)
+    })
+  })
+
+  // --- role computeds ---
+
+  describe('role computeds', () => {
+    it('admin: isAdmin true, canAccessAdminPanel true, isReadonlyAdmin false', () => {
+      const store = useAuthStore()
+      store.user = fakeAdminUser
+      expect(store.isAdmin).toBe(true)
+      expect(store.canAccessAdminPanel).toBe(true)
+      expect(store.isReadonlyAdmin).toBe(false)
+    })
+
+    it('readonly_admin: isAdmin false, canAccessAdminPanel true, isReadonlyAdmin true', () => {
+      const store = useAuthStore()
+      store.user = fakeReadonlyAdminUser
+      // isAdmin 必须保持严格语义，不能被放宽
+      expect(store.isAdmin).toBe(false)
+      expect(store.canAccessAdminPanel).toBe(true)
+      expect(store.isReadonlyAdmin).toBe(true)
+    })
+
+    it('user: all false', () => {
+      const store = useAuthStore()
+      store.user = fakeUser
+      expect(store.isAdmin).toBe(false)
+      expect(store.canAccessAdminPanel).toBe(false)
+      expect(store.isReadonlyAdmin).toBe(false)
     })
   })
 

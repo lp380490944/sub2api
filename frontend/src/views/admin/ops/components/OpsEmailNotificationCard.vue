@@ -2,6 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
+import { useAuthStore } from '@/stores/auth'
 import { opsAPI } from '@/api/admin/ops'
 import type { EmailNotificationConfig, AlertSeverity } from '../types'
 import BaseDialog from '@/components/common/BaseDialog.vue'
@@ -9,6 +10,8 @@ import Select from '@/components/common/Select.vue'
 
 const { t } = useI18n()
 const appStore = useAppStore()
+const authStore = useAuthStore()
+const isReadonlyAdmin = computed(() => authStore.isReadonlyAdmin)
 
 const loading = ref(false)
 const config = ref<EmailNotificationConfig | null>(null)
@@ -198,7 +201,7 @@ onMounted(() => {
           </svg>
           {{ t('common.refresh') }}
         </button>
-        <button class="btn btn-sm btn-secondary" :disabled="!config" @click="openEditor">{{ t('common.edit') }}</button>
+        <button v-if="!isReadonlyAdmin" class="btn btn-sm btn-secondary" :disabled="!config" @click="openEditor">{{ t('common.edit') }}</button>
       </div>
     </div>
 

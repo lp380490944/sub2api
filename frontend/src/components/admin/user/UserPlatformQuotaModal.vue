@@ -39,8 +39,10 @@
                     step="0.01"
                     class="input w-24"
                     :placeholder="t('admin.users.platformQuota.placeholder')"
+                    :disabled="isReadonlyAdmin"
                   />
                   <button
+                    v-if="!isReadonlyAdmin"
                     type="button"
                     class="text-xs text-gray-400 hover:text-amber-500 disabled:opacity-50"
                     :disabled="!!resetting[`${row.platform}.daily`]"
@@ -58,8 +60,10 @@
                     step="0.01"
                     class="input w-24"
                     :placeholder="t('admin.users.platformQuota.placeholder')"
+                    :disabled="isReadonlyAdmin"
                   />
                   <button
+                    v-if="!isReadonlyAdmin"
                     type="button"
                     class="text-xs text-gray-400 hover:text-amber-500 disabled:opacity-50"
                     :disabled="!!resetting[`${row.platform}.weekly`]"
@@ -77,8 +81,10 @@
                     step="0.01"
                     class="input w-24"
                     :placeholder="t('admin.users.platformQuota.placeholder')"
+                    :disabled="isReadonlyAdmin"
                   />
                   <button
+                    v-if="!isReadonlyAdmin"
                     type="button"
                     class="text-xs text-gray-400 hover:text-amber-500 disabled:opacity-50"
                     :disabled="!!resetting[`${row.platform}.monthly`]"
@@ -94,7 +100,7 @@
           </tbody>
         </table>
         <p class="mt-3 text-xs text-gray-500">{{ t('admin.users.platformQuota.hint') }}</p>
-        <div class="mt-3">
+        <div v-if="!isReadonlyAdmin" class="mt-3">
           <button type="button" class="btn btn-secondary text-sm" @click="onClearAll">
             {{ t('admin.users.platformQuota.clearAll') }}
           </button>
@@ -106,7 +112,7 @@
         <button type="button" class="btn btn-secondary" @click="$emit('close')">
           {{ t('admin.users.platformQuota.cancel') }}
         </button>
-        <button type="button" class="btn btn-primary" :disabled="submitting || loading" @click="onSave">
+        <button v-if="!isReadonlyAdmin" type="button" class="btn btn-primary" :disabled="submitting || loading" @click="onSave">
           {{ submitting ? t('admin.users.platformQuota.saving') : t('admin.users.platformQuota.save') }}
         </button>
       </div>
@@ -118,6 +124,7 @@
 import { ref, reactive, watch, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
+import { useAuthStore } from '@/stores/auth'
 import { adminAPI } from '@/api/admin'
 import type { AdminUser, PlatformQuotaItem, PlatformQuotaPlatform, PlatformQuotaWindow } from '@/types'
 import BaseDialog from '@/components/common/BaseDialog.vue'
@@ -127,6 +134,8 @@ const emit = defineEmits(['close', 'success'])
 
 const { t } = useI18n()
 const appStore = useAppStore()
+const authStore = useAuthStore()
+const isReadonlyAdmin = computed(() => authStore.isReadonlyAdmin)
 
 const PLATFORMS: PlatformQuotaPlatform[] = ['anthropic', 'openai', 'gemini', 'antigravity', 'grok']
 

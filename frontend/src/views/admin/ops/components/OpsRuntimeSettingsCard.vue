@@ -2,12 +2,15 @@
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
+import { useAuthStore } from '@/stores/auth'
 import { opsAPI } from '@/api/admin/ops'
 import type { OpsAlertRuntimeSettings } from '../types'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 
 const { t } = useI18n()
 const appStore = useAppStore()
+const authStore = useAuthStore()
+const isReadonlyAdmin = computed(() => authStore.isReadonlyAdmin)
 
 const loading = ref(false)
 const saving = ref(false)
@@ -264,7 +267,7 @@ onMounted(() => {
       <div class="rounded-2xl bg-gray-50 p-4 dark:bg-dark-700/50">
         <div class="mb-3 flex items-center justify-between">
           <h4 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('admin.ops.runtime.alertTitle') }}</h4>
-          <button class="btn btn-sm btn-secondary" @click="openAlertEditor">{{ t('common.edit') }}</button>
+          <button v-if="!isReadonlyAdmin" class="btn btn-sm btn-secondary" @click="openAlertEditor">{{ t('common.edit') }}</button>
         </div>
         <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
           <div class="text-xs text-gray-600 dark:text-gray-300">

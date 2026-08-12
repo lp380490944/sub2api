@@ -68,6 +68,15 @@ func (u *User) IsAdmin() bool {
 	return u.Role == RoleAdmin
 }
 
+// CanAccessAdminPanel 报告该用户是否可以进入 /v1/admin 路由组。
+//
+// 与 IsAdmin 的区别：IsAdmin 表达"是真正的管理员"这一权限语义，被邮箱验证豁免、
+// 管理员计数、防止删除最后一名管理员等逻辑依赖，严禁放宽。本方法仅表达"能进后台
+// 大门"，进门后能做什么由 middleware.ReadonlyAdminGuard 的白名单决定。
+func (u *User) CanAccessAdminPanel() bool {
+	return u.Role == RoleAdmin || u.Role == RoleReadonlyAdmin
+}
+
 func (u *User) IsActive() bool {
 	return u.Status == StatusActive
 }

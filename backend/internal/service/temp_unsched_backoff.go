@@ -2,6 +2,13 @@ package service
 
 import "time"
 
+// NOTE(fork): this sequence is the ONLY source of the cooldown length. A rule's
+// own duration_minutes is a trigger gate, not a duration — triggerTempUnschedulable
+// rejects rules with duration_minutes <= 0 and then discards the value. This holds
+// for the model-scoped path too. Upstream instead honours the rule's duration; if
+// that behaviour is ever restored, ratelimit_service_model_not_found_test.go's
+// Bare404 expectation and the admin-panel hint must change back with it.
+//
 // tempUnschedBackoffSequence is the duration sequence applied to repeated
 // temp-unschedulable triggers. Position 0 is the first strike; the last
 // entry saturates on further strikes until a fresh-start resets.

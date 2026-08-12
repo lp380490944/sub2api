@@ -10,6 +10,7 @@ import { formatHistoryLabel, sumNumbers } from '../utils/opsFormatters'
 import HelpTooltip from '@/components/common/HelpTooltip.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import { formatNumber } from '@/utils/format'
+import { useAuthStore } from '@/stores'
 
 ChartJS.register(Title, Tooltip, Legend, LineElement, LinearScale, PointElement, CategoryScale, Filler)
 
@@ -24,6 +25,8 @@ interface Props {
 
 const props = defineProps<Props>()
 const { t } = useI18n()
+const authStore = useAuthStore()
+const isReadonlyAdmin = computed(() => authStore.isReadonlyAdmin)
 const emit = defineEmits<{
   (e: 'selectPlatform', platform: string): void
   (e: 'selectGroup', groupId: number): void
@@ -211,6 +214,7 @@ function downloadChart() {
             {{ t('admin.ops.charts.resetZoom') }}
           </button>
           <button
+            v-if="!isReadonlyAdmin"
             type="button"
             class="inline-flex shrink-0 items-center rounded-lg border border-gray-200 bg-white px-2 py-1 text-[11px] font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50 dark:border-dark-700 dark:bg-dark-900 dark:text-gray-300 dark:hover:bg-dark-800"
             :disabled="state !== 'ready'"

@@ -63,6 +63,26 @@ func isBedrockModelInvalidError(statusCode int, body []byte) bool {
 	return strings.Contains(normalized, bedrockModelInvalidPhrase)
 }
 
+const bedrockOperationNotAllowedPhrase = "operation not allowed"
+
+// isBedrockOperationNotAllowedError matches the Claude-Platform-on-AWS / Bedrock
+// Mantle 400 returned when the account's key is not entitled to the requested
+// model in its region, e.g. {"message":"Operation not allowed"}.
+// Permanence matches bedrockModelInvalidPhrase: retrying the same
+// (account, model) pair cannot succeed — only another region's account can.
+//
+// The phrase is generic enough that a third-party relay could emit it for
+// unrelated reasons, so matching is restricted to AWS-backed accounts.
+func isBedrockOperationNotAllowedError(account *Account, statusCode int, body []byte) bool {
+	if account == nil || statusCode != http.StatusBadRequest {
+		return false
+	}
+	if !account.IsBedrock() && !account.IsOpenAIBedrockMantle() {
+		return false
+	}
+	return strings.Contains(normalizeModelNotFoundBody(body), bedrockOperationNotAllowedPhrase)
+}
+
 func containsModelNotFoundKeyword(normalizedBody string) bool {
 	if normalizedBody == "" {
 		return false

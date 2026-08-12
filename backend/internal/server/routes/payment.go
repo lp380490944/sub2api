@@ -73,6 +73,8 @@ func RegisterPaymentRoutes(
 	adminGroup.Use(gin.HandlerFunc(adminAuth))
 	adminGroup.Use(gin.HandlerFunc(auditLog))
 	adminGroup.Use(middleware.AdminComplianceGuard(settingService))
+	// 支付管理端自成一个 group，不经过 RegisterAdminRoutes，必须单独挂载只读管理员守卫。
+	adminGroup.Use(middleware.ReadonlyAdminGuard())
 	{
 		// Dashboard
 		adminGroup.GET("/dashboard", adminPaymentHandler.GetDashboard)

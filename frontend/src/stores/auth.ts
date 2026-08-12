@@ -6,7 +6,13 @@
 import { defineStore } from 'pinia'
 import { ref, computed, readonly } from 'vue'
 import { authAPI, isTotp2FARequired, passkeyAPI, type LoginResponse } from '@/api'
-import type { User, LoginRequest, RegisterRequest, AuthResponse } from '@/types'
+import type {
+  User,
+  LoginRequest,
+  RegisterRequest,
+  AuthResponse,
+  ActionCaptchaRequestProof
+} from '@/types'
 
 const AUTH_TOKEN_KEY = 'auth_token'
 const AUTH_USER_KEY = 'auth_user'
@@ -88,6 +94,16 @@ export const useAuthStore = defineStore('auth', () => {
 
   const isAdmin = computed(() => {
     return user.value?.role === 'admin'
+  })
+
+  const isReadonlyAdmin = computed(() => {
+    return user.value?.role === 'readonly_admin'
+  })
+
+  // 能否进入管理后台大门。具体能看哪些页面由路由守卫与侧边栏白名单决定，
+  // 真正的权限边界在后端 ReadonlyAdminGuard。
+  const canAccessAdminPanel = computed(() => {
+    return isAdmin.value || isReadonlyAdmin.value
   })
 
   const isSimpleMode = computed(() => runMode.value === 'simple')
@@ -275,9 +291,9 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  async function loginWithPasskey(): Promise<User> {
+  async function loginWithPasskey(proof?: ActionCaptchaRequestProof): Promise<User> {
     try {
-      const response = await passkeyAPI.login()
+      const response = await passkeyAPI.login(proof)
       setAuthFromResponse(response)
       return user.value!
     } catch (error) {
@@ -492,6 +508,8 @@ export const useAuthStore = defineStore('auth', () => {
     // Computed
     isAuthenticated,
     isAdmin,
+    isReadonlyAdmin,
+    canAccessAdminPanel,
     isSimpleMode,
     hasPendingAuthSession,
 

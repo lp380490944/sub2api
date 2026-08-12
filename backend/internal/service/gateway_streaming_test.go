@@ -175,7 +175,12 @@ func TestHandleStreamingResponse_EmptyStream(t *testing.T) {
 	c.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", nil)
 
 	pr, pw := io.Pipe()
-	resp := &http.Response{StatusCode: http.StatusOK, Header: http.Header{}, Body: pr}
+	// NOTE(fork): 必须带 text/event-stream。本 fork 的
+	// streamContentTypeLooksSuspicious 会把 Content-Type 缺失的 200 响应
+	// 预缓冲并判为基础设施级失败，转成 UpstreamFailoverError(502) 去换号，
+	// 于是根本走不到"缺少终止事件"这条流内断言。空 http.Header{} 测的是
+	// 可疑响应体分支，不是本用例想覆盖的空流分支。
+	resp := &http.Response{StatusCode: http.StatusOK, Header: sseResponseHeader(), Body: pr}
 
 	go func() {
 		// 直接关闭，不发送任何事件

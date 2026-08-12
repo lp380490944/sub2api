@@ -14,6 +14,9 @@ const (
 const (
 	RoleAdmin = "admin"
 	RoleUser  = "user"
+	// RoleReadonlyAdmin 只读管理员：可进入管理后台的受限模块，不可执行任何写操作。
+	// 授权由 middleware.ReadonlyAdminGuard 的白名单强制，默认拒绝。
+	RoleReadonlyAdmin = "readonly_admin"
 )
 
 // Platform constants
@@ -132,6 +135,12 @@ var DefaultAntigravityModelMapping = map[string]string{
 	"gemini-3.1-flash-image": "gemini-3.1-flash-image",
 	// Gemini 3.1 image preview 映射
 	"gemini-3.1-flash-image-preview": "gemini-3.1-flash-image",
+	// Gemini 3.6 Flash tiered models
+	"gemini-3.6-flash":        "gemini-3.6-flash",
+	"gemini-3.6-flash-high":   "gemini-3.6-flash-high",
+	"gemini-3.6-flash-low":    "gemini-3.6-flash-low",
+	"gemini-3.6-flash-medium": "gemini-3.6-flash-medium",
+	"gemini-3.6-flash-tiered": "gemini-3.6-flash-tiered",
 	// Gemini 3 image 兼容映射（向 3.1 image 迁移）
 	"gemini-3-pro-image":         "gemini-3.1-flash-image",
 	"gemini-3-pro-image-preview": "gemini-3.1-flash-image",
