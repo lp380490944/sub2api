@@ -573,6 +573,13 @@ const (
 	// Claude Code Version Check
 	// =========================
 
+	// fork(P1-2) CLI Version Tracking
+	// SettingKeyCLICurrentVersion 当前对外伪装的 Claude Code CLI 版本号（semver），
+	// 由 CLIVersionTrackerService 周期性从 npm 拉取并写入；启动时回填到 claude 包运行时变量。
+	SettingKeyCLICurrentVersion = "cli_current_version"
+	// SettingKeyCLIRecentVersions 最近 3 个 Claude Code CLI 版本（JSON 数组，最新在前）。
+	SettingKeyCLIRecentVersions = "cli_recent_versions"
+
 	// SettingKeyMinClaudeCodeVersion 最低 Claude Code 版本号要求 (semver, 如 "2.1.0"，空值=不检查)
 	SettingKeyMinClaudeCodeVersion = "min_claude_code_version"
 	// SettingKeyMinCodexVersion 最低 Codex 引擎版本要求 (semver, 如 "0.141.0"，空值=不检查)

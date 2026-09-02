@@ -101,6 +101,7 @@ type Config struct {
 	Gemini                  GeminiConfig                  `mapstructure:"gemini"`
 	Update                  UpdateConfig                  `mapstructure:"update"`
 	Idempotency             IdempotencyConfig             `mapstructure:"idempotency"`
+	CLIVersionTracker       CLIVersionTrackerConfig       `mapstructure:"cli_version_tracker"`
 	BatchImage              BatchImageConfig              `mapstructure:"batch_image"`
 	ImageStorage            ImageStorageConfig            `mapstructure:"image_storage"`
 	Plugins                 PluginConfig                  `mapstructure:"plugins"`
@@ -115,6 +116,24 @@ type PluginConfig struct {
 	MaxUploadBytes       int64             `mapstructure:"max_upload_bytes"`
 	MaxUncompressedBytes int64             `mapstructure:"max_uncompressed_bytes"`
 	StartTimeoutSeconds  int               `mapstructure:"start_timeout_seconds"`
+}
+
+// CLIVersionTrackerConfig 配置 fork(P1-2) 的 Claude Code CLI 版本追踪器。
+//
+// 用途：周期性从 npm registry 拉取 @anthropic-ai/claude-code 的最新版本号，
+// 写入 settings.cli_current_version；同时维护 cli_recent_versions 列表供
+// per-account 版本扰动使用。
+type CLIVersionTrackerConfig struct {
+	// Enabled 是否启用周期性拉取（默认 true）。关闭后启动时仍会从 DB 回填一次，但不会主动拉 npm。
+	Enabled bool `mapstructure:"enabled"`
+	// IntervalHours 拉取间隔（小时），默认 24。设为 0 或负数等同于禁用。
+	IntervalHours int `mapstructure:"interval_hours"`
+	// NpmRegistryURL npm registry dist-tags 地址，内网环境可指向私有镜像。
+	NpmRegistryURL string `mapstructure:"npm_registry_url"`
+	// RequestTimeoutSec 单次拉取请求的超时（秒），默认 15。
+	RequestTimeoutSec int `mapstructure:"request_timeout_sec"`
+	// MaxRecentVersions 保留的最近版本数，默认 3（latest / N-1 / N-2）。
+	MaxRecentVersions int `mapstructure:"max_recent_versions"`
 }
 
 type LogConfig struct {
@@ -2180,6 +2199,13 @@ func setDefaults() {
 	viper.SetDefault("redis.enable_tls", false)
 
 	// Batch Image queue
+	// fork(P1-2) CLI version tracker
+	viper.SetDefault("cli_version_tracker.enabled", true)
+	viper.SetDefault("cli_version_tracker.interval_hours", 24)
+	viper.SetDefault("cli_version_tracker.npm_registry_url", "https://registry.npmjs.org/-/package/@anthropic-ai/claude-code/dist-tags")
+	viper.SetDefault("cli_version_tracker.request_timeout_sec", 15)
+	viper.SetDefault("cli_version_tracker.max_recent_versions", 3)
+
 	viper.SetDefault("batch_image.enabled", false)
 	viper.SetDefault("batch_image.max_items_per_job_default", 200)
 	viper.SetDefault("batch_image.max_items_per_job_trial", 50)

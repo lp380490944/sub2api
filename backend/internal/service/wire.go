@@ -945,6 +945,7 @@ var ProviderSet = wire.NewSet(
 	ProvideChannelMonitorV2Service,
 	ProvideChannelMonitorV2Aggregator,
 	NewChannelMonitorRequestTemplateService,
+	ProvideCLIVersionTrackerService,
 	ProvideUserPlatformQuotaUsageFlusher,
 )
 
@@ -1037,4 +1038,11 @@ func ProvideChannelMonitorV2Aggregator(repo ChannelMonitorV2Repository, db *sql.
 	}
 	aggregator.Start()
 	return aggregator
+}
+
+// ProvideCLIVersionTrackerService 创建并启动 CLIVersionTrackerService（fork P1-2）。
+func ProvideCLIVersionTrackerService(settingRepo SettingRepository, cfg *config.Config) *CLIVersionTrackerService {
+	svc := NewCLIVersionTrackerService(settingRepo, cfg.CLIVersionTracker)
+	svc.Start()
+	return svc
 }

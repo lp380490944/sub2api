@@ -36,7 +36,7 @@ const (
 	// maxFingerprintUserAgentLength 限制写入缓存的 User-Agent 长度。
 	maxFingerprintUserAgentLength = 256
 	// maxClaudeCLIMajorVersionSkew 是 claude-cli 主版本号相对 sub2api 自身伪装
-	// 版本（claude.CLICurrentVersion）允许的最大超前量。给足两个大版本的升级
+	// 版本（claude.GetCLICurrentVersion()）允许的最大超前量。给足两个大版本的升级
 	// 窗口，同时挡掉 999 这类哨兵版本号。
 	maxClaudeCLIMajorVersionSkew = 2
 )
@@ -68,7 +68,7 @@ func isAcceptableFingerprintUserAgent(ua string) bool {
 	if !ok {
 		return false
 	}
-	currentMajor, _, _, currentOK := parseUserAgentVersion(claudeCLIUserAgentProduct + "/" + claude.CLICurrentVersion)
+	currentMajor, _, _, currentOK := parseUserAgentVersion(claudeCLIUserAgentProduct + "/" + claude.GetCLICurrentVersion())
 	if !currentOK {
 		return true
 	}
@@ -77,7 +77,7 @@ func isAcceptableFingerprintUserAgent(ua string) bool {
 
 // 默认指纹值（当客户端未提供时使用）
 var defaultFingerprint = Fingerprint{
-	UserAgent:               "claude-cli/" + claude.CLICurrentVersion + " (external, cli)",
+	UserAgent:               "claude-cli/" + claude.CLIDefaultVersion + " (external, cli)",
 	StainlessLang:           "js",
 	StainlessPackageVersion: "0.94.0",
 	StainlessOS:             "Linux",
@@ -125,6 +125,49 @@ func NewIdentityService(cache IdentityCache) *IdentityService {
 // GetOrCreateFingerprint 获取或创建账号的指纹
 // 如果缓存存在，检测user-agent版本，新版本则更新
 // 如果缓存不存在，生成随机ClientID并从请求头创建指纹，然后缓存
+// GetOrCreateFingerprintForAccount 获取或创建账号的指纹（fork P1-1/P1-2）。
+//
+// 与 GetOrCreateFingerprint 的区别只在非 claude-cli 客户端（NewAPI 透传的 Go-http-client、
+// OpenClaw、各类 SDK）：这类请求**不读不写**账号级持久缓存，每次返回 defaultFingerprint
+// 副本，并做两处覆盖：
+//   - P1-1：用 account.Extra["registration_fingerprint"] 中记录的注册设备 OS/Arch 覆盖
+//     默认的 Linux/arm64，使对外 x-stainless-os 与 Anthropic OAuth 时记录的设备一致；
+//   - P1-2：用 PickCLIVersionForAccount 按账号稳定地从最近 3 个 CC 版本中选一个，
+//     避免全部账号同一时刻打着完全一致的 UA。
+//
+// 不写缓存是关键：上游实现会把非 CLI 请求落成的 claude-cli/<默认版本> + Linux 指纹持久化
+// 7 天，且"只升不降"，之后真 CLI 客户端带来的更低版本号也覆盖不掉。
+//
+// 对 claude-cli 客户端，行为与 GetOrCreateFingerprint 完全一致（CC 客户端自带真实 stainless 头）。
+func (s *IdentityService) GetOrCreateFingerprintForAccount(ctx context.Context, account *Account, headers http.Header) (*Fingerprint, error) {
+	clientUA := strings.TrimSpace(headers.Get("User-Agent"))
+	if account == nil || extractProduct(clientUA) == claudeCLIUserAgentProduct {
+		accountID := int64(0)
+		if account != nil {
+			accountID = account.ID
+		}
+		return s.GetOrCreateFingerprint(ctx, accountID, headers)
+	}
+
+	fp := defaultFingerprint
+	if v := PickCLIVersionForAccount(account.ID); v != "" {
+		fp.UserAgent = claude.BuildUserAgentForVersion(v)
+	}
+	if regFp := GetRegistrationFingerprint(account); regFp != nil {
+		if regFp.OS != "" {
+			fp.StainlessOS = regFp.OS
+		}
+		if regFp.Arch != "" {
+			fp.StainlessArch = regFp.Arch
+		}
+		// runtime/runtime_version 故意保持默认（node/v24.3.0）：要 mimic 的是 Claude CLI，
+		// 浏览器真实 runtime 反而会暴露代理身份。
+	}
+	fp.ClientID = generateClientID()
+	fp.UpdatedAt = time.Now().Unix()
+	return &fp, nil
+}
+
 func (s *IdentityService) GetOrCreateFingerprint(ctx context.Context, accountID int64, headers http.Header) (*Fingerprint, error) {
 	// 入口统一校验：创建与升级两条路径共用，任一路径漏掉都会让畸形 UA 被持久化。
 	clientUA := strings.TrimSpace(headers.Get("User-Agent"))

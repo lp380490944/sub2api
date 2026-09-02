@@ -146,7 +146,7 @@ func TestGetOrCreateFingerprintAcceptsValidUserAgentOnCreate(t *testing.T) {
 	cache := &stubIdentityCache{}
 	svc := NewIdentityService(cache)
 
-	ua := "claude-cli/" + claude.CLICurrentVersion + " (external, cli)"
+	ua := "claude-cli/" + claude.CLIDefaultVersion + " (external, cli)"
 	fp, err := svc.GetOrCreateFingerprint(context.Background(), 1, headersWithUA(ua))
 
 	require.NoError(t, err)
