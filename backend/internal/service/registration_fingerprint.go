@@ -82,11 +82,8 @@ func ParseRegistrationFingerprintFromUA(ua string) *RegistrationFingerprint {
 		}
 	}
 
-	if fp.OS == "" {
-		// Couldn't determine OS; still return non-nil so caller can record the raw UA for audit
-		// but downstream merge logic skips empty fields (preserving defaults).
-	}
-
+	// OS 无法识别时仍返回非 nil：调用方会记录原始 UA 供审计，
+	// 下游 merge 逻辑会跳过空字段（保留默认值）。
 	return fp
 }
 
