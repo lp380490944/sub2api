@@ -348,7 +348,10 @@ func buildClaudeMimicDebugLine(req *http.Request, body []byte, account *Account,
 
 	h := make([]string, 0, len(interesting))
 	for _, k := range interesting {
-		if v := req.Header.Get(k); v != "" {
+		// 出站头用 setHeaderRaw 以 wire 大小写（x-app / x-stainless-os …）或原样大小写
+		// （X-Stainless-OS）写入，Header.Get 的规范化查找找不到它们，会让诊断行漏印
+		// 实际已发送的头；必须走 getHeaderRaw。
+		if v := getHeaderRaw(req.Header, k); v != "" {
 			h = append(h, fmt.Sprintf("%s=%q", k, safeHeaderValueForLog(k, v)))
 		}
 	}
