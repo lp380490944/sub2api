@@ -84,9 +84,9 @@ func (s *GatewayService) buildUpstreamRequest(ctx context.Context, c *gin.Contex
 		}
 	}
 
-	// 同步 billing header cc_version 与实际发送的 User-Agent 版本
-	if fingerprint != nil {
-		body = syncBillingHeaderVersion(body, fingerprint.UserAgent)
+	// Mimicry may override the cached User-Agent later, even without a fingerprint.
+	if billingUA := effectiveBillingUserAgent(tokenType, mimicClaudeCode, fingerprint); billingUA != "" {
+		body = syncBillingHeaderVersion(body, billingUA)
 	}
 
 	// === 计算最终 anthropic-beta header（先于 body sanitize 与 CCH 签名）===
@@ -166,6 +166,12 @@ func (s *GatewayService) buildUpstreamRequest(ctx context.Context, c *gin.Contex
 	// （user-agent/x-stainless-*/x-app/Accept/x-stainless-helper-method/x-client-request-id）
 	if tokenType == "oauth" && mimicClaudeCode {
 		applyClaudeCodeMimicHeaders(req, reqStream)
+		// fork：账号级指纹（按账号分桶的 CLI 版本 + 注册设备 OS/Arch）必须压过全局默认头，
+		// 否则出站 UA 与 body 里按指纹同步的 cc_version 会不一致（被判第三方的信号）。
+		// 与 effectiveBillingUserAgent 的取值顺序严格对应。
+		if fingerprint != nil {
+			s.identityService.ApplyFingerprint(req, fingerprint)
+		}
 	}
 
 	// 写入最终 anthropic-beta header
@@ -847,6 +853,9 @@ var defaultDroppedBetasSet = buildBetaTokenSet(claude.DroppedBetas)
 // applyClaudeCodeMimicHeaders forces "Claude Code-like" request headers.
 // This mirrors opencode-anthropic-auth behavior: do not trust downstream
 // headers when using Claude Code-scoped OAuth credentials.
+//
+// 注意：调用方在有账号指纹时会紧接着再 ApplyFingerprint 一次，让指纹字段压过这里的全局默认值；
+// 本函数自身保持"无条件覆盖"语义，保证客户端透传进来的 user-agent / x-stainless-* 绝不会漏到上游。
 func applyClaudeCodeMimicHeaders(req *http.Request, isStream bool) {
 	if req == nil {
 		return

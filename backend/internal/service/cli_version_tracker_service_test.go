@@ -87,16 +87,31 @@ func TestReloadFromDB_AppliesVersion(t *testing.T) {
 	})
 
 	repo := newCLITrackerFakeSettingRepo(map[string]string{
-		SettingKeyCLICurrentVersion: "2.1.200",
-		SettingKeyCLIRecentVersions: `["2.1.200","2.1.199"]`,
+		SettingKeyCLICurrentVersion: "2.1.900",
+		SettingKeyCLIRecentVersions: `["2.1.900","2.1.899"]`,
 	})
 	svc := NewCLIVersionTrackerService(repo, config.CLIVersionTrackerConfig{
 		Enabled:           false, // 不启动 ticker，仅测试 reload
 		MaxRecentVersions: 3,
 	})
 	require.NoError(t, svc.ReloadFromDB(context.Background()))
-	require.Equal(t, "2.1.200", claude.GetCLICurrentVersion())
-	require.Equal(t, []string{"2.1.200", "2.1.199"}, GetCachedRecentVersions())
+	require.Equal(t, "2.1.900", claude.GetCLICurrentVersion())
+	require.Equal(t, []string{"2.1.900", "2.1.899"}, GetCachedRecentVersions())
+}
+
+// DB 里残留的版本低于内置基线（二进制升级后常见）时不能把运行时版本拉低：
+// 新模型的客户端版本闸门（如 Fable 5.1 >= 2.1.251）以内置基线为底。
+func TestReloadFromDB_BelowBaselineIgnored(t *testing.T) {
+	orig := claude.GetCLICurrentVersion()
+	t.Cleanup(func() { claude.SetCLICurrentVersion(orig) })
+
+	repo := newCLITrackerFakeSettingRepo(map[string]string{
+		SettingKeyCLICurrentVersion: "2.1.200",
+	})
+	svc := NewCLIVersionTrackerService(repo, config.CLIVersionTrackerConfig{Enabled: false})
+	require.NoError(t, svc.ReloadFromDB(context.Background()))
+	require.Equal(t, orig, claude.GetCLICurrentVersion(), "below-baseline DB value must be ignored")
+	require.GreaterOrEqual(t, CompareVersions(claude.GetCLICurrentVersion(), claude.CLICurrentVersion), 0)
 }
 
 func TestReloadFromDB_InvalidVersionIgnored(t *testing.T) {

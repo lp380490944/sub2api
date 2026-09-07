@@ -167,7 +167,8 @@ func TestGetOrCreateFingerprint_LegacyAPI_StillWorks(t *testing.T) {
 func TestGetOrCreateFingerprintForAccount_NonCC_AppliesPerAccountVersionDithering(t *testing.T) {
 	origRecent := GetCachedRecentVersions()
 	t.Cleanup(func() { SetCachedRecentVersions(origRecent) })
-	SetCachedRecentVersions([]string{"2.1.117", "2.1.116", "2.1.115"})
+	// 版本必须不低于内置基线 claude.CLICurrentVersion，否则会被分桶守卫拒绝（见下一个用例）。
+	SetCachedRecentVersions([]string{"2.1.917", "2.1.916", "2.1.915"})
 
 	svc := NewIdentityService(&trackingIdentityCache{})
 
@@ -192,6 +193,24 @@ func TestGetOrCreateFingerprintForAccount_NonCC_AppliesPerAccountVersionDitherin
 	a1, _ := svc.GetOrCreateFingerprintForAccount(context.Background(), &Account{ID: 99}, headers)
 	a2, _ := svc.GetOrCreateFingerprintForAccount(context.Background(), &Account{ID: 99}, headers)
 	require.Equal(t, a1.UserAgent, a2.UserAgent, "same accountID should produce same UA")
-	expectedUA := claude.BuildUserAgentForVersion(claude.PickVersionForAccount(99, []string{"2.1.117", "2.1.116", "2.1.115"}))
+	expectedUA := claude.BuildUserAgentForVersion(claude.PickVersionForAccount(99, []string{"2.1.917", "2.1.916", "2.1.915"}))
 	require.Equal(t, expectedUA, a1.UserAgent)
+}
+
+// 分桶守卫：DB 里残留的过旧 recent 列表（低于内置基线）不能把账号送到新模型的
+// 客户端版本闸门之下——此时退回运行时当前版本。
+func TestGetOrCreateFingerprintForAccount_NonCC_RejectsRecentVersionsBelowBaseline(t *testing.T) {
+	origRecent := GetCachedRecentVersions()
+	t.Cleanup(func() { SetCachedRecentVersions(origRecent) })
+	SetCachedRecentVersions([]string{"2.1.117", "2.1.116", "2.1.115"})
+
+	svc := NewIdentityService(&trackingIdentityCache{})
+	headers := http.Header{}
+	headers.Set("User-Agent", "OpenAI/JS 6.26.0")
+
+	for id := int64(1); id <= 50; id++ {
+		fp, err := svc.GetOrCreateFingerprintForAccount(context.Background(), &Account{ID: id}, headers)
+		require.NoError(t, err)
+		require.Equal(t, claude.BuildUserAgentForVersion(claude.CLIVersion()), fp.UserAgent)
+	}
 }

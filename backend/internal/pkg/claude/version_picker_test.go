@@ -110,7 +110,8 @@ func TestSetCLICurrentVersion_InvalidRejected(t *testing.T) {
 	orig := GetCLICurrentVersion()
 	t.Cleanup(func() { SetCLICurrentVersion(orig) })
 
-	for _, bad := range []string{"abc", "2.1", "2.1.0-beta", "v2.1.0", "2.1.0.1"} {
+	// 末尾两项低于内置基线：tracker/DB 残留的旧值不能把 UA 拉回新模型闸门之下。
+	for _, bad := range []string{"abc", "2.1", "2.1.0-beta", "v2.1.0", "2.1.0.1", "2.1.219", "1.0.0"} {
 		if SetCLICurrentVersion(bad) {
 			t.Errorf("invalid version %q was accepted", bad)
 		}
@@ -128,7 +129,7 @@ func TestSetCLICurrentVersion_EmptyResetsToDefault(t *testing.T) {
 	if !SetCLICurrentVersion("") {
 		t.Fatal("empty should reset to default and return true")
 	}
-	if got := GetCLICurrentVersion(); got != CLIDefaultVersion {
-		t.Errorf("empty should reset to default %q, got %q", CLIDefaultVersion, got)
+	if got := GetCLICurrentVersion(); got != resolvedCLIVersion {
+		t.Errorf("empty should reset to static floor %q, got %q", resolvedCLIVersion, got)
 	}
 }

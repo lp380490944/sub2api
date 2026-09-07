@@ -5,16 +5,35 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/claude"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 )
 
-// ccVersionInBillingRe matches the semver part of cc_version (X.Y.Z), preserving
-// the trailing message-derived suffix (e.g. ".c02") if present.
+// ccVersionInBillingRe matches the semver part of cc_version (X.Y.Z).
 var ccVersionInBillingRe = regexp.MustCompile(`cc_version=\d+\.\d+\.\d+`)
+
+var ccVersionWithFingerprintInBillingRe = regexp.MustCompile(`cc_version=\d+\.\d+\.\d+\.[0-9a-fA-F]{3}\b`)
+
+// effectiveBillingUserAgent 返回"最终会出现在出站 User-Agent 头上"的值，供 body 里的
+// cc_version 同步使用。取值必须与 buildUpstreamRequest / buildCountTokensRequest 写头的
+// 顺序严格一致：
+//   - OAuth mimicry：先强制全局 DefaultHeaders，再用账号指纹（若有）覆盖 → 有指纹取指纹 UA，
+//     否则取 DefaultHeaders["User-Agent"]（fork：上游此处无条件取 DefaultHeaders）；
+//   - 其它：有指纹取指纹 UA，否则不同步（保留客户端自己的 billing 块）。
+func effectiveBillingUserAgent(tokenType string, mimicClaudeCode bool, fingerprint *Fingerprint) string {
+	if fingerprint != nil && fingerprint.UserAgent != "" {
+		return fingerprint.UserAgent
+	}
+	if tokenType == "oauth" && mimicClaudeCode {
+		return claude.DefaultHeaders["User-Agent"]
+	}
+	return ""
+}
 
 // syncBillingHeaderVersion rewrites cc_version in x-anthropic-billing-header
 // system text blocks to match the version extracted from userAgent.
+// Recompute any recognized fingerprint suffix because its input includes the version.
 // Only touches system array blocks whose text starts with "x-anthropic-billing-header".
 func syncBillingHeaderVersion(body []byte, userAgent string) []byte {
 	version := ExtractCLIVersion(userAgent)
@@ -33,7 +52,9 @@ func syncBillingHeaderVersion(body []byte, userAgent string) []byte {
 		text := item.Get("text")
 		if text.Exists() && text.Type == gjson.String &&
 			strings.HasPrefix(text.String(), "x-anthropic-billing-header") {
-			newText := ccVersionInBillingRe.ReplaceAllString(text.String(), replacement)
+			fingerprintedReplacement := replacement + "." + computeClaudeCodeFingerprint(body, version)
+			newText := ccVersionWithFingerprintInBillingRe.ReplaceAllString(text.String(), fingerprintedReplacement)
+			newText = ccVersionInBillingRe.ReplaceAllString(newText, replacement)
 			if newText != text.String() {
 				if updated, err := sjson.SetBytes(body, fmt.Sprintf("system.%d.text", idx), newText); err == nil {
 					body = updated
