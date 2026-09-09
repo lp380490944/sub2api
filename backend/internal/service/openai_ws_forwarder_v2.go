@@ -579,6 +579,7 @@ func (s *OpenAIGatewayService) forwardOpenAIWSV2(
 				}
 			}
 			message = restoreCodexToolNamesFromContext(c, message)
+			message = restoreCodexFingerprintIDsInPayload(c, account, message)
 		}
 		if openAIWSMessageShouldParseUsage(eventType, message) {
 			parseOpenAIWSResponseUsageFromCompletedEvent(message, usage)

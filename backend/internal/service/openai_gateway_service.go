@@ -491,6 +491,10 @@ type OpenAIGatewayService struct {
 	// 剥离跨账号回带（openai_codex_turn_state.go）。
 	openaiCodexTurnStateOrigins sync.Map
 	openaiCodexTurnStateWrites  atomic.Uint64
+	// openaiCodexThreadIDs: thread 模式下“账号+原会话键 → 派生 thread id”的进程内 L1，
+	// Redis 之前的快路径（openai_codex_fingerprint_thread.go）。
+	openaiCodexThreadIDs      sync.Map
+	openaiCodexThreadIDWrites atomic.Uint64
 }
 
 // NewOpenAIGatewayService creates a new OpenAIGatewayService

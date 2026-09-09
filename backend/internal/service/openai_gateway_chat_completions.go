@@ -285,7 +285,26 @@ func (s *OpenAIGatewayService) forwardAsChatCompletions(
 		} else if promptCacheKey != "" {
 			reqBody["prompt_cache_key"] = promptCacheKey
 		}
+		// fork(thread 模式)：Chat 兼容入口同样按客户端会话仿真出站身份。原值在命名空间改写前捕获；
+		// 非 thread 模式保持本入口一贯的“不做指纹收敛”行为（显式 stage nil，防 failover 残留）。
+		threadOriginals := codexThreadOriginals{}
+		threadMode := account.GetCodexFingerprintMode() == codexFingerprintThread
+		if threadMode {
+			var clientHeaders http.Header
+			if c != nil && c.Request != nil {
+				clientHeaders = c.Request.Header
+			}
+			threadOriginals = captureCodexThreadOriginals(reqBody, clientHeaders)
+			threadOriginals.conversationSeed = codexThreadConversationSeed(c, responsesBody)
+		}
 		applyCodexAccountIdentityClientMetadataMap(reqBody, codexAccountIdentitySource(c, account), getAPIKeyIDFromContext(c))
+		stageCodexFingerprintIDs(c, nil)
+		if threadMode {
+			if fpIDs := s.resolveCodexThreadFingerprintIDs(ctx, account, threadOriginals); fpIDs != nil {
+				applyCodexFingerprintClientMetadata(reqBody, fpIDs)
+				stageCodexFingerprintIDs(c, fpIDs)
+			}
+		}
 		responsesBody, err = json.Marshal(reqBody)
 		if err != nil {
 			return nil, fmt.Errorf("remarshal after codex transform: %w", err)
@@ -338,7 +357,8 @@ func (s *OpenAIGatewayService) forwardAsChatCompletions(
 		return nil, fmt.Errorf("build upstream request: %w", err)
 	}
 
-	if promptCacheKey != "" {
+	// thread 模式下会话身份已由 staged IDs 统一写入（且不发下划线头），跳过本入口的 session_id 覆写。
+	if promptCacheKey != "" && stagedCodexFingerprintIDs(c, account) == nil {
 		apiKeyID := getAPIKeyIDFromContext(c)
 		sessionKey := promptCacheKey
 		if !compatPromptCacheTenantIsolated {

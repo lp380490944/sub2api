@@ -77,6 +77,13 @@ const (
 	// codexFingerprintFull 收敛所有标识：installation_id + session_id + thread_id。
 	// 上游看到 1 台设备 + 1 会话 + 1 线程，最激进。
 	codexFingerprintFull codexFingerprintMode = "full"
+	// codexFingerprintThread 按客户端会话仿真真实 Codex 客户端身份（fork）：
+	// installation 收敛为账号级（同 device），其余会话标识从客户端请求体原值
+	// （prompt_cache_key / client_metadata）按账号确定性派生为 UUIDv7 并保留原时间戳，
+	// session-id == thread-id == x-client-request-id == prompt_cache_key，root_turn_id == turn_id，
+	// 且不再发送真实客户端从不发的下划线头 session_id / conversation_id。
+	// 面向“客户端身份头被中继剥掉、只剩请求体”的部署形态，见 openai_codex_fingerprint_thread.go。
+	codexFingerprintThread codexFingerprintMode = "thread"
 )
 
 const (
@@ -116,7 +123,7 @@ func codexFingerprintModeFromExtra(extra map[string]any) codexFingerprintMode {
 	}
 	raw, _ := extra[codexFingerprintModeExtraKey].(string)
 	switch codexFingerprintMode(strings.TrimSpace(raw)) {
-	case codexFingerprintOff, codexFingerprintDevice, codexFingerprintSession, codexFingerprintFull:
+	case codexFingerprintOff, codexFingerprintDevice, codexFingerprintSession, codexFingerprintFull, codexFingerprintThread:
 		return codexFingerprintMode(strings.TrimSpace(raw))
 	default:
 		return codexFingerprintOff
@@ -125,7 +132,7 @@ func codexFingerprintModeFromExtra(extra map[string]any) codexFingerprintMode {
 
 func codexFingerprintModeRequiresSeed(mode codexFingerprintMode) bool {
 	switch mode {
-	case codexFingerprintDevice, codexFingerprintSession, codexFingerprintFull:
+	case codexFingerprintDevice, codexFingerprintSession, codexFingerprintFull, codexFingerprintThread:
 		return true
 	default:
 		return false
@@ -272,6 +279,21 @@ type codexFingerprintIDs struct {
 	turnStartedAtUnixMs           int64
 	originalBodySessionID         string
 	originalBodySessionIDCaptured bool
+
+	// 以下字段仅 thread 模式使用（openai_codex_fingerprint_thread.go）。
+	rootTurnID       string
+	contextWindowID  string
+	parentThreadID   string // 空 = 不发 x-codex-parent-thread-id
+	windowNumber     int
+	turnMetadataJSON string // 头与体共用的最终 x-codex-turn-metadata 字符串，只构造一次，杜绝两侧漂移
+	// exposeReplacements 派生值 → 客户端原值，供响应体去混淆（对应 CPA applyCodexIdentityExposeResponsePayload）。
+	exposeReplacements []codexIdentityReplacement
+}
+
+// codexIdentityReplacement 一对（出站派生值，客户端原值）。
+type codexIdentityReplacement struct {
+	derived  string
+	original string
 }
 
 // resolveCodexFingerprintIDs 按收敛模式计算出站 ID 集合。
@@ -362,6 +384,28 @@ func applyCodexFingerprintHeaders(h http.Header, ids *codexFingerprintIDs) {
 	// 所有非 off 模式都收敛 installation_id
 	h.Set("x-codex-installation-id", ids.installationID)
 
+	if ids.mode == codexFingerprintThread {
+		// 真实 Codex 每个请求必发的四个会话头，根会话三者相等（抓包对照表 §2）。
+		h.Set("session-id", ids.sessionID)
+		h.Set("thread-id", ids.threadID)
+		h.Set("x-client-request-id", ids.threadID)
+		h.Set("x-codex-window-id", ids.windowID)
+		// 真实客户端每个请求都带 turn-metadata，这里总是发送（体内 client_metadata 用同一份字符串）。
+		if ids.turnMetadataJSON != "" {
+			h.Set("x-codex-turn-metadata", ids.turnMetadataJSON)
+		}
+		if ids.parentThreadID != "" {
+			h.Set(codexParentThreadIDHeader, ids.parentThreadID)
+		} else {
+			h.Del(codexParentThreadIDHeader)
+		}
+		// 真实 Codex 从不发下划线形式的 session_id / conversation_id；
+		// 网关合成的 16 位十六进制假头是最明显的非真实客户端特征。
+		h.Del("session_id")
+		h.Del("conversation_id")
+		return
+	}
+
 	if ids.mode == codexFingerprintDevice {
 		rewriteCodexTurnMetadataFields(h, map[string]any{
 			"installation_id": ids.installationID,
@@ -448,6 +492,25 @@ func applyCodexFingerprintToClientMetadataMap(existing map[string]any, ids *code
 		modified = true
 	}
 
+	if ids.mode == codexFingerprintThread {
+		// 与出站头逐字段镜像；x-codex-turn-metadata 直接写入已构造好的同一份字符串，
+		// 不再走 rewriteClientMetadataEmbeddedTurnMetadata（那是 session/full 的增量改写）。
+		existing["session_id"] = ids.sessionID
+		existing["thread_id"] = ids.threadID
+		existing["turn_id"] = ids.turnID
+		existing["root_turn_id"] = ids.rootTurnID
+		existing["x-codex-window-id"] = ids.windowID
+		if ids.turnMetadataJSON != "" {
+			existing["x-codex-turn-metadata"] = ids.turnMetadataJSON
+		}
+		if ids.parentThreadID != "" {
+			existing[codexParentThreadIDHeader] = ids.parentThreadID
+		} else {
+			delete(existing, codexParentThreadIDHeader)
+		}
+		return true
+	}
+
 	if ids.mode == codexFingerprintDevice {
 		rewriteClientMetadataEmbeddedTurnMetadata(existing, map[string]any{
 			"installation_id": ids.installationID,
@@ -514,6 +577,14 @@ func applyCodexFingerprintPromptCacheKey(reqBody map[string]any, ids *codexFinge
 	if reqBody == nil {
 		return false
 	}
+	if ids != nil && ids.mode == codexFingerprintThread && ids.threadID != "" {
+		// thread 模式：prompt_cache_key 恒等于派生 thread（真实客户端 prompt_cache_key == session），缺失则注入。
+		if current, _ := reqBody["prompt_cache_key"].(string); current == ids.threadID {
+			return false
+		}
+		reqBody["prompt_cache_key"] = ids.threadID
+		return true
+	}
 	promptCacheKey, ok := reqBody["prompt_cache_key"].(string)
 	if !ok || strings.TrimSpace(promptCacheKey) == "" || !shouldRewriteCodexFingerprintPromptCacheKey(ids, promptCacheKey) {
 		return false
@@ -569,6 +640,18 @@ func applyCodexFingerprintClientMetadataRaw(body []byte, ids *codexFingerprintID
 		modified = true
 	}
 	promptCacheKey := gjson.GetBytes(body, "prompt_cache_key")
+	if ids.mode == codexFingerprintThread && ids.threadID != "" {
+		// 与 map 版一致：thread 模式无条件写入派生 thread（缺失则注入）。
+		if promptCacheKey.String() != ids.threadID {
+			rewritten, err := sjson.SetBytes(next, "prompt_cache_key", ids.threadID)
+			if err != nil {
+				return body, false, fmt.Errorf("splice thread prompt_cache_key: %w", err)
+			}
+			next = rewritten
+			modified = true
+		}
+		return next, modified, nil
+	}
 	if promptCacheKey.Exists() && promptCacheKey.Type == gjson.String && strings.TrimSpace(promptCacheKey.String()) != "" && shouldRewriteCodexFingerprintPromptCacheKey(ids, promptCacheKey.String()) {
 		rewritten, err := sjson.SetBytes(next, "prompt_cache_key", ids.sessionID)
 		if err != nil {

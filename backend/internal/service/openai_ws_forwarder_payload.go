@@ -193,6 +193,7 @@ func (s *OpenAIGatewayService) buildOpenAIWSHeaders(
 		strings.TrimSpace(headers.Get(openAICodexRoutingHintHeader)) != "",
 		"soft_routing_hint",
 	)
+	logCodexIdentityDebug("ws", account, headers, nil)
 
 	return headers, sessionResolution, nil
 }

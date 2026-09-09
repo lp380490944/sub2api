@@ -249,6 +249,51 @@ func (c *gatewayCache) SetReasoningContent(ctx context.Context, itemID string, c
 	return c.rdb.Set(ctx, reasoningContentPrefix+itemID, content, ttl).Err()
 }
 
+// codexThreadIDPrefix 是 thread 模式下“客户端原会话键 → 派生 thread id”的持久映射前缀。
+// 原值不是 UUIDv7 时派生值的时间戳段取首见时刻，必须跨请求/跨重启稳定，故落 Redis；
+// 键已由调用方按账号与原值哈希（见 service.codexThreadIDStoreKey），不含明文会话信息。
+const codexThreadIDPrefix = "codex_thread_id:"
+
+// codexThreadIDDefaultTTL 与 reasoning 缓存对齐：一个 Codex 会话通常在一周内结束，
+// 过期后同一会话再来会得到新的时间戳段（随机段仍相同），可接受。
+const codexThreadIDDefaultTTL = 7 * 24 * time.Hour
+
+// SetCodexThreadID 记录派生 thread id；仅首写生效（SetNX），多副本竞争时以先到者为准。
+// 实现 service 层的可选能力接口，不属于 GatewayCache 接口本身。
+func (c *gatewayCache) SetCodexThreadID(ctx context.Context, key string, value string, ttl time.Duration) error {
+	if c == nil || c.rdb == nil {
+		return errors.New("gateway cache unavailable")
+	}
+	key = strings.TrimSpace(key)
+	value = strings.TrimSpace(value)
+	if key == "" || value == "" {
+		return nil
+	}
+	if ttl <= 0 {
+		ttl = codexThreadIDDefaultTTL
+	}
+	return c.rdb.SetNX(ctx, codexThreadIDPrefix+key, value, ttl).Err()
+}
+
+// GetCodexThreadID 返回已记录的派生 thread id；未命中返回空串且 err == nil。
+func (c *gatewayCache) GetCodexThreadID(ctx context.Context, key string) (string, error) {
+	if c == nil || c.rdb == nil {
+		return "", errors.New("gateway cache unavailable")
+	}
+	key = strings.TrimSpace(key)
+	if key == "" {
+		return "", nil
+	}
+	val, err := c.rdb.Get(ctx, codexThreadIDPrefix+key).Result()
+	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			return "", nil
+		}
+		return "", err
+	}
+	return val, nil
+}
+
 // GetReasoningContent 返回缓存的 reasoning 全文；未命中返回
 // service.ErrReasoningContentNotFound。
 func (c *gatewayCache) GetReasoningContent(ctx context.Context, itemID string) (string, error) {

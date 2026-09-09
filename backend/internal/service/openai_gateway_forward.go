@@ -524,6 +524,17 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 		if currentClientPromptCacheKey, ok := decoded["prompt_cache_key"].(string); ok {
 			clientPromptCacheKey = currentClientPromptCacheKey
 		}
+		var clientHeaders http.Header
+		if c != nil && c.Request != nil {
+			clientHeaders = c.Request.Header
+		}
+		// fork(thread 模式)：客户端原始会话标识必须在下面的账号命名空间改写之前捕获，
+		// 否则拿到的已是 v4 形状的派生值（openai_codex_fingerprint_thread.go）。
+		threadOriginals := codexThreadOriginals{}
+		if !isCompactRequest && account.GetCodexFingerprintMode() == codexFingerprintThread {
+			threadOriginals = captureCodexThreadOriginals(decoded, clientHeaders)
+			threadOriginals.conversationSeed = codexThreadConversationSeed(c, body)
+		}
 		// Account namespace is orthogonal to fingerprint convergence: preserve
 		// each client's identity cardinality, but never reuse it across OAuth
 		// credentials after scheduler failover.
@@ -534,11 +545,7 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 		// 指纹收敛：一次性解析收敛 ID，请求体和出站头共享同一份 IDs（保证 turn_id 等随机字段一致）。
 		// fingerprintIDs 在此处解析，后续 buildUpstreamRequest 中使用同一份。
 		if !isCompactRequest {
-			var clientHeaders http.Header
-			if c != nil && c.Request != nil {
-				clientHeaders = c.Request.Header
-			}
-			fpIDs := resolveCodexFingerprintIDsFromRequest(account, clientHeaders)
+			fpIDs := s.resolveCodexFingerprintIDsForAttempt(ctx, account, threadOriginals, clientHeaders)
 			if fpIDs != nil {
 				if applyCodexFingerprintClientMetadata(decoded, fpIDs) {
 					markDecodedModified()
@@ -1486,6 +1493,7 @@ func (s *OpenAIGatewayService) buildUpstreamRequest(ctx context.Context, c *gin.
 	applyOpenAICodexBetaFeatures(c, account, req.Header)
 	setOpenAICodexRoutingHintFromBody(req.Header, account, body)
 	logOpenAIRoutingDiagnosticsFromBody(ctx, account, "http", req.Header, body, "not_applicable")
+	logCodexIdentityDebug("http", account, req.Header, body)
 
 	return req, nil
 }
