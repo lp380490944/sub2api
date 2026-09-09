@@ -163,6 +163,8 @@ type httpUpstreamService struct {
 	clients map[string]*upstreamClientEntry // 客户端缓存池，key 由隔离策略决定
 	// OpenAI 走 HTTP/HTTPS 代理时的 H2->H1 回退状态（key=标准化 proxyKey）
 	openAIHTTP2Fallbacks sync.Map
+	// fork：Codex chrome-h2 传输的 RoundTripper 缓存（key=标准化 proxyKey，无状态可复用）
+	chromeH2RoundTrippers sync.Map
 }
 
 // NewHTTPUpstream 创建通用 HTTP 上游服务
@@ -246,6 +248,9 @@ func (s *httpUpstreamService) DoWithTLS(req *http.Request, proxyURL string, acco
 	if profile == nil {
 		return s.Do(req, proxyURL, accountID, accountConcurrency)
 	}
+	if tlsfingerprint.IsChromeH2Profile(profile) {
+		return s.doChromeH2(req, proxyURL, accountID, accountConcurrency)
+	}
 	// Plain HTTP has no TLS handshake to fingerprint. Reuse the normal transport
 	// so a configured HTTP or SOCKS proxy is not bypassed.
 	if req != nil && req.URL != nil && strings.EqualFold(req.URL.Scheme, "http") {
@@ -294,6 +299,78 @@ func (s *httpUpstreamService) DoWithTLS(req *http.Request, proxyURL string, acco
 		atomic.StoreInt64(&entry.lastUsed, time.Now().UnixNano())
 	})
 
+	return resp, nil
+}
+
+// doChromeH2 fork：Codex 传输层指纹（docs/fork/CODEX_IDENTITY_EMULATION.md §3）。
+// Chrome ClientHello + HTTP/2 + 每请求一连接，仿照 CLIProxyAPI。RoundTripper 无状态，
+// 按代理缓存一个实例即可。建连阶段（拨号/握手/ALPN/h2 初始化）失败回退普通 Do 并告警——
+// 这是与 CPA 唯一有意的偏离：代理线路质量不可控，不能因传输层试验损失请求；
+// 请求发出后的错误不回退（不重放非幂等请求）。https 代理无法走明文 CONNECT，直接走普通路径。
+func (s *httpUpstreamService) doChromeH2(req *http.Request, proxyURL string, accountID int64, accountConcurrency int) (*http.Response, error) {
+	if req != nil && req.URL != nil && strings.EqualFold(req.URL.Scheme, "http") {
+		return s.Do(req, proxyURL, accountID, accountConcurrency)
+	}
+	proxyKey, parsedProxy, err := normalizeProxyURL(proxyURL)
+	if err != nil {
+		return nil, err
+	}
+	// 日志只打脱敏的代理标识（host:port），proxyKey 含鉴权信息，绝不能进日志。
+	proxyLabel := directProxyKey
+	if parsedProxy != nil {
+		proxyLabel = parsedProxy.Scheme + "://" + parsedProxy.Host
+	}
+	if parsedProxy != nil && strings.EqualFold(parsedProxy.Scheme, "https") {
+		slog.Warn("codex_chrome_h2_fallback", "account_id", accountID, "stage", "proxy_scheme", "proxy", proxyLabel)
+		return s.Do(req, proxyURL, accountID, accountConcurrency)
+	}
+	if err := s.validateRequestHost(req); err != nil {
+		return nil, err
+	}
+
+	rtAny, _ := s.chromeH2RoundTrippers.LoadOrStore(proxyKey, tlsfingerprint.NewChromeH2RoundTripper(parsedProxy))
+	rt, _ := rtAny.(*tlsfingerprint.ChromeH2RoundTripper)
+	if rt == nil {
+		rt = tlsfingerprint.NewChromeH2RoundTripper(parsedProxy)
+	}
+
+	// http.Client 在 RoundTrip 出错时会关闭请求体；回退重发前必须能重建它。
+	if req != nil && req.Body != nil && req.Body != http.NoBody && req.GetBody == nil {
+		buf, readErr := io.ReadAll(req.Body)
+		_ = req.Body.Close()
+		if readErr != nil {
+			return nil, readErr
+		}
+		req.Body = io.NopCloser(bytes.NewReader(buf))
+		req.GetBody = func() (io.ReadCloser, error) { return io.NopCloser(bytes.NewReader(buf)), nil }
+		req.ContentLength = int64(len(buf))
+	}
+
+	client := s.httpClientForUpstreamRequest(&http.Client{Transport: rt}, req)
+	resp, err := servertiming.Do(client, req)
+	if err != nil {
+		if tlsfingerprint.IsSetupError(err) {
+			slog.Warn("codex_chrome_h2_fallback", "account_id", accountID, "stage", "setup", "proxy", proxyLabel, "error", err)
+			if req != nil && req.GetBody != nil {
+				body, getErr := req.GetBody()
+				if getErr != nil {
+					return nil, getErr
+				}
+				req.Body = body
+			}
+			return s.Do(req, proxyURL, accountID, accountConcurrency)
+		}
+		slog.Debug("codex_chrome_h2_request_failed", "account_id", accountID, "error", err)
+		return nil, err
+	}
+	// Info 级：灰度期间每请求一行审计（只在账号显式开启时出现），证明确实走了 Chrome/h2 传输。
+	cipher, alpn := "", ""
+	if resp.TLS != nil {
+		cipher = fmt.Sprintf("0x%04x", resp.TLS.CipherSuite)
+		alpn = resp.TLS.NegotiatedProtocol
+	}
+	slog.Info("codex_chrome_h2_request_done", "account_id", accountID, "status", resp.StatusCode, "proto", resp.Proto, "alpn", alpn, "cipher", cipher, "proxy", proxyLabel)
+	decompressResponseBody(resp)
 	return resp, nil
 }
 

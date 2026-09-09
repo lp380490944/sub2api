@@ -141,13 +141,25 @@ func NewSOCKS5ProxyDialer(profile *Profile, proxyURL *url.URL) *SOCKS5ProxyDiale
 // DialTLSContext establishes a TLS connection through SOCKS5 proxy with the configured fingerprint.
 // Flow: SOCKS5 CONNECT to target -> TLS handshake with utls on the tunnel
 func (d *SOCKS5ProxyDialer) DialTLSContext(ctx context.Context, network, addr string) (net.Conn, error) {
-	slog.Debug("tls_fingerprint_socks5_connecting", "proxy", d.proxyURL.Host, "target", addr)
+	conn, err := DialSOCKS5Tunnel(ctx, d.proxyURL, addr)
+	if err != nil {
+		return nil, err
+	}
+	// Perform TLS handshake on the tunnel with utls fingerprint
+	return performTLSHandshake(ctx, conn, d.profile, addr)
+}
+
+// DialSOCKS5Tunnel establishes a raw TCP tunnel to addr through a SOCKS5 proxy.
+// No TLS is performed; callers wrap the returned conn with their own handshake
+// (custom-profile dialer above, or the Chrome/HTTP2 round tripper in chrome_h2.go).
+func DialSOCKS5Tunnel(ctx context.Context, proxyURL *url.URL, addr string) (net.Conn, error) {
+	slog.Debug("tls_fingerprint_socks5_connecting", "proxy", proxyURL.Host, "target", addr)
 
 	// Step 1: Create SOCKS5 dialer
 	var auth *proxy.Auth
-	if d.proxyURL.User != nil {
-		username := d.proxyURL.User.Username()
-		password, _ := d.proxyURL.User.Password()
+	if proxyURL.User != nil {
+		username := proxyURL.User.Username()
+		password, _ := proxyURL.User.Password()
 		auth = &proxy.Auth{
 			User:     username,
 			Password: password,
@@ -155,9 +167,9 @@ func (d *SOCKS5ProxyDialer) DialTLSContext(ctx context.Context, network, addr st
 	}
 
 	// Determine proxy address
-	proxyAddr := d.proxyURL.Host
-	if d.proxyURL.Port() == "" {
-		proxyAddr = net.JoinHostPort(d.proxyURL.Hostname(), "1080") // Default SOCKS5 port
+	proxyAddr := proxyURL.Host
+	if proxyURL.Port() == "" {
+		proxyAddr = net.JoinHostPort(proxyURL.Hostname(), "1080") // Default SOCKS5 port
 	}
 
 	socksDialer, err := proxy.SOCKS5("tcp", proxyAddr, auth, proxy.Direct)
@@ -168,32 +180,46 @@ func (d *SOCKS5ProxyDialer) DialTLSContext(ctx context.Context, network, addr st
 
 	// Step 2: Establish SOCKS5 tunnel to target
 	slog.Debug("tls_fingerprint_socks5_establishing_tunnel", "target", addr)
-	conn, err := socksDialer.Dial("tcp", addr)
+	var conn net.Conn
+	if contextDialer, ok := socksDialer.(proxy.ContextDialer); ok && ctx != nil {
+		conn, err = contextDialer.DialContext(ctx, "tcp", addr)
+	} else {
+		conn, err = socksDialer.Dial("tcp", addr)
+	}
 	if err != nil {
 		slog.Debug("tls_fingerprint_socks5_connect_failed", "error", err)
 		return nil, fmt.Errorf("SOCKS5 connect: %w", err)
 	}
 	slog.Debug("tls_fingerprint_socks5_tunnel_established")
-
-	// Step 3: Perform TLS handshake on the tunnel with utls fingerprint
-	return performTLSHandshake(ctx, conn, d.profile, addr)
+	return conn, nil
 }
 
 // DialTLSContext establishes a TLS connection through HTTP proxy with the configured fingerprint.
 // Flow: TCP connect to proxy -> CONNECT tunnel -> TLS handshake with utls
 func (d *HTTPProxyDialer) DialTLSContext(ctx context.Context, network, addr string) (net.Conn, error) {
-	slog.Debug("tls_fingerprint_http_proxy_connecting", "proxy", d.proxyURL.Host, "target", addr)
+	conn, err := DialHTTPConnectTunnel(ctx, d.proxyURL, addr)
+	if err != nil {
+		return nil, err
+	}
+	// Perform TLS handshake on the tunnel with utls fingerprint
+	return performTLSHandshake(ctx, conn, d.profile, addr)
+}
+
+// DialHTTPConnectTunnel establishes a raw TCP tunnel to addr through an HTTP
+// proxy (plaintext CONNECT). No TLS is performed on the returned conn.
+func DialHTTPConnectTunnel(ctx context.Context, proxyURL *url.URL, addr string) (net.Conn, error) {
+	slog.Debug("tls_fingerprint_http_proxy_connecting", "proxy", proxyURL.Host, "target", addr)
 
 	// Step 1: TCP connect to proxy server
 	var proxyAddr string
-	if d.proxyURL.Port() != "" {
-		proxyAddr = d.proxyURL.Host
+	if proxyURL.Port() != "" {
+		proxyAddr = proxyURL.Host
 	} else {
 		// Default ports
-		if d.proxyURL.Scheme == "https" {
-			proxyAddr = net.JoinHostPort(d.proxyURL.Hostname(), "443")
+		if proxyURL.Scheme == "https" {
+			proxyAddr = net.JoinHostPort(proxyURL.Hostname(), "443")
 		} else {
-			proxyAddr = net.JoinHostPort(d.proxyURL.Hostname(), "80")
+			proxyAddr = net.JoinHostPort(proxyURL.Hostname(), "80")
 		}
 	}
 
@@ -214,9 +240,9 @@ func (d *HTTPProxyDialer) DialTLSContext(ctx context.Context, network, addr stri
 	}
 
 	// Add proxy authentication if present
-	if d.proxyURL.User != nil {
-		username := d.proxyURL.User.Username()
-		password, _ := d.proxyURL.User.Password()
+	if proxyURL.User != nil {
+		username := proxyURL.User.Username()
+		password, _ := proxyURL.User.Password()
 		auth := base64.StdEncoding.EncodeToString([]byte(username + ":" + password))
 		req.Header.Set("Proxy-Authorization", "Basic "+auth)
 	}
@@ -245,9 +271,7 @@ func (d *HTTPProxyDialer) DialTLSContext(ctx context.Context, network, addr stri
 		return nil, fmt.Errorf("proxy CONNECT failed: %s", resp.Status)
 	}
 	slog.Debug("tls_fingerprint_http_proxy_tunnel_established")
-
-	// Step 4: Perform TLS handshake on the tunnel with utls fingerprint
-	return performTLSHandshake(ctx, conn, d.profile, addr)
+	return conn, nil
 }
 
 // DialTLSContext establishes a TLS connection with the configured fingerprint.

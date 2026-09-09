@@ -1,6 +1,10 @@
 package service
 
-import "net/http"
+import (
+	"net/http"
+
+	"github.com/Wei-Shaw/sub2api/internal/pkg/tlsfingerprint"
+)
 
 func (s *OpenAIGatewayService) SetPluginManager(manager *PluginManager) {
 	s.pluginManager = manager
@@ -14,6 +18,11 @@ func (s *OpenAIGatewayService) doOpenAIUpstream(request *http.Request, proxyURL 
 		if handled {
 			return response, err
 		}
+	}
+	// fork：Codex 传输层指纹（Chrome ClientHello + HTTP/2 + 每请求一连接，仿 CPA），账号级 opt-in。
+	// 只换传输层；请求头/体/身份与插件优先级不变。
+	if account.IsCodexChromeH2Transport() {
+		return s.httpUpstream.DoWithTLS(request, proxyURL, account.ID, account.Concurrency, tlsfingerprint.ChromeH2Profile())
 	}
 	return s.httpUpstream.Do(request, proxyURL, account.ID, account.Concurrency)
 }

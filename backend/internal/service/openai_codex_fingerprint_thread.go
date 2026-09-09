@@ -555,10 +555,10 @@ func logCodexIdentityDebug(where string, account *Account, h http.Header, body [
 			fmt.Sprintf("body.client_metadata=%s", gjson.GetBytes(body, "client_metadata").Raw),
 		)
 	}
-	aid, mode := int64(0), codexFingerprintOff
+	aid, mode, transport := int64(0), codexFingerprintOff, ""
 	if account != nil {
-		aid, mode = account.ID, account.GetCodexFingerprintMode()
+		aid, mode, transport = account.ID, account.GetCodexFingerprintMode(), account.CodexTransport()
 	}
-	logger.LegacyPrintf("service.openai_gateway", "[CodexIdentityDebug] where=%s account=%d mode=%s %s",
-		where, aid, mode, strings.Join(parts, " "))
+	logger.LegacyPrintf("service.openai_gateway", "[CodexIdentityDebug] where=%s account=%d mode=%s transport=%q %s",
+		where, aid, mode, transport, strings.Join(parts, " "))
 }

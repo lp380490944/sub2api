@@ -2321,6 +2321,27 @@ func (a *Account) IsAnthropicOAuthOrSetupToken() bool {
 // IsTLSFingerprintEnabled 检查是否启用 TLS 指纹伪装
 // 仅适用于 Anthropic OAuth/SetupToken 类型账号
 // 启用后将模拟 Claude Code (Node.js) 客户端的 TLS 握手特征
+// CodexTransportChromeH2 是 fork 的 Codex 传输层指纹开关值（docs/fork/CODEX_IDENTITY_EMULATION.md §3）：
+// Chrome ClientHello + HTTP/2 + 每请求一连接，仿照 CLIProxyAPI。
+const (
+	codexTransportExtraKey = "codex_transport"
+	CodexTransportChromeH2 = "chrome-h2"
+)
+
+// CodexTransport 返回 OpenAI OAuth/SetupToken 账号的 Codex 传输层配置；未设或非 OpenAI OAuth 返回空串。
+func (a *Account) CodexTransport() string {
+	if a == nil || !a.IsOpenAIOAuthLike() || a.Extra == nil {
+		return ""
+	}
+	raw, _ := a.Extra[codexTransportExtraKey].(string)
+	return strings.ToLower(strings.TrimSpace(raw))
+}
+
+// IsCodexChromeH2Transport 报告账号是否启用 chrome-h2 传输。默认关闭，显式 opt-in。
+func (a *Account) IsCodexChromeH2Transport() bool {
+	return a.CodexTransport() == CodexTransportChromeH2
+}
+
 func (a *Account) IsTLSFingerprintEnabled() bool {
 	// 仅支持 Anthropic OAuth/SetupToken 账号
 	if !a.IsAnthropicOAuthOrSetupToken() {

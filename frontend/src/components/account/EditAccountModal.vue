@@ -2151,6 +2151,17 @@
             <Select v-model="codexFingerprintMode" data-testid="edit-codex-fingerprint-mode-select" :options="codexFingerprintModeOptions" />
           </div>
         </div>
+        <div class="mt-4 flex items-center justify-between gap-4">
+          <div class="min-w-0">
+            <label class="input-label mb-0">{{ t('admin.accounts.openai.codexTransport') }}</label>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              {{ t('admin.accounts.openai.codexTransportDesc') }}
+            </p>
+          </div>
+          <div class="w-52 flex-shrink-0">
+            <Select v-model="codexTransport" data-testid="edit-codex-transport-select" :options="codexTransportOptions" />
+          </div>
+        </div>
       </div>
 
       <!-- OpenAI 订阅档位手动覆盖（Plus/Pro/Free），仅 OAuth 非影子账号 -->
@@ -3351,6 +3362,12 @@ const editWeeklyResetMode = ref<'rolling' | 'fixed' | null>(null)
 const editWeeklyResetDay = ref<number | null>(null)
 const editWeeklyResetHour = ref<number | null>(null)
 const editResetTimezone = ref<string | null>(null)
+type CodexTransport = 'off' | 'chrome-h2'
+const codexTransport = ref<CodexTransport>('off')
+const codexTransportOptions = computed(() => [
+  { value: 'off' as CodexTransport, label: t('admin.accounts.openai.codexTransportOff') },
+  { value: 'chrome-h2' as CodexTransport, label: t('admin.accounts.openai.codexTransportChromeH2') }
+])
 const codexFingerprintModeOptions = computed(() => [
   { value: 'off' as CodexFingerprintMode, label: t('admin.accounts.openai.codexFingerprintOff') },
   { value: 'device' as CodexFingerprintMode, label: t('admin.accounts.openai.codexFingerprintDevice') },
@@ -3802,6 +3819,7 @@ const syncFormFromAccount = (newAccount: Account | null) => {
   codexCLIOnlyEnabled.value = false
   codexCLIOnlyAppServerEnabled.value = false
   codexFingerprintMode.value = 'off'
+  codexTransport.value = 'off'
   codexImageToolMode.value = 'inherit'
   anthropicPassthroughEnabled.value = false
   anthropicAPIKeyAuthScheme.value = 'x_api_key'
@@ -3859,6 +3877,7 @@ const syncFormFromAccount = (newAccount: Account | null) => {
       codexFingerprintMode.value = (['off', 'device', 'session', 'full', 'thread'].includes(fpMode || '')
         ? fpMode as CodexFingerprintMode
         : 'off')
+      codexTransport.value = extra?.codex_transport === 'chrome-h2' ? 'chrome-h2' : 'off'
     }
     const credentials = newAccount.credentials as Record<string, unknown> | undefined
     const compactMappings = credentials?.compact_model_mapping as Record<string, string> | undefined
@@ -5333,6 +5352,12 @@ const handleSubmit = async () => {
           newExtra.codex_fingerprint_mode = codexFingerprintMode.value
         } else {
           delete newExtra.codex_fingerprint_mode
+        }
+        // Codex 传输层指纹（fork）：默认 off 不落键
+        if (codexTransport.value === 'chrome-h2') {
+          newExtra.codex_transport = 'chrome-h2'
+        } else {
+          delete newExtra.codex_transport
         }
       }
 

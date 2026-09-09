@@ -37,6 +37,8 @@ type httpUpstreamRecorder struct {
 	resp      *http.Response
 	responses []*http.Response
 	err       error
+
+	lastProfile *tlsfingerprint.Profile
 }
 
 type passthroughErrReadCloser struct {
@@ -87,6 +89,7 @@ func (u *httpUpstreamRecorder) Do(req *http.Request, proxyURL string, accountID 
 }
 
 func (u *httpUpstreamRecorder) DoWithTLS(req *http.Request, proxyURL string, accountID int64, accountConcurrency int, profile *tlsfingerprint.Profile) (*http.Response, error) {
+	u.lastProfile = profile
 	return u.Do(req, proxyURL, accountID, accountConcurrency)
 }
 

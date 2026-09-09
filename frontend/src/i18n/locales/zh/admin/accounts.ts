@@ -723,6 +723,10 @@ export default {
         codexFingerprintSession: '设备+会话',
         codexFingerprintFull: '完全收敛',
         codexFingerprintThread: '会话线程（按客户端会话派生，最贴近真实客户端）',
+        codexTransport: 'Codex 传输层指纹',
+        codexTransportDesc: '出站 TLS/HTTP2 传输形态。Chrome：Chrome ClientHello + HTTP/2 + 每请求一连接（与 CLIProxyAPI 一致）；建连失败自动回退普通传输。默认关闭。',
+        codexTransportOff: '关闭（Go 默认，默认）',
+        codexTransportChromeH2: 'Chrome（CPA 同款）',
         codexImageTool: 'Codex 图片桥接策略',
         codexImageToolDesc:
           '统一控制 Codex /responses 文本请求的 hosted image_generation 桥接和客户端图片工具声明。hosted 工具自动注入仅适用于非 Responses Lite 请求；账号级策略优先于渠道和全局配置，不影响独立图片生成接口。',

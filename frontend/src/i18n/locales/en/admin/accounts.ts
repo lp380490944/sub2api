@@ -645,6 +645,10 @@ export default {
         codexFingerprintSession: 'Device + Session',
         codexFingerprintFull: 'Full convergence',
         codexFingerprintThread: 'Thread (derive per client conversation)',
+        codexTransport: 'Codex transport fingerprint',
+        codexTransportDesc: 'Outbound TLS/HTTP2 transport shape. Chrome: Chrome ClientHello + HTTP/2 + one connection per request (same as CLIProxyAPI); falls back to the plain transport when the connection cannot be set up. Off by default.',
+        codexTransportOff: 'Off (Go default, default)',
+        codexTransportChromeH2: 'Chrome (CLIProxyAPI style)',
         codexImageTool: 'Codex image bridge policy',
         codexImageToolDesc:
           'Controls the hosted image_generation bridge and client-declared image tools on Codex /responses text requests. Hosted auto-injection applies only to non-Responses Lite requests. Account policy takes precedence over channel and global settings; standalone image-generation endpoints are unaffected.',
