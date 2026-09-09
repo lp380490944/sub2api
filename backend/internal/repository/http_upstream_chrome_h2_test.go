@@ -14,7 +14,8 @@ import (
 
 // 建连阶段失败（代理不可达）必须回退到普通 Do，且请求体在回退后仍可重发。
 func TestDoWithTLS_ChromeH2_SetupFailureFallsBackToDo(t *testing.T) {
-	svc := NewHTTPUpstream(&config.Config{}).(*httpUpstreamService)
+	svc, ok := NewHTTPUpstream(&config.Config{}).(*httpUpstreamService)
+	require.True(t, ok)
 
 	body := []byte(`{"input":"hi"}`)
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, "https://127.0.0.1:1/v1/responses", bytes.NewReader(body))
@@ -37,7 +38,8 @@ func TestDoWithTLS_ChromeH2_SetupFailureFallsBackToDo(t *testing.T) {
 
 // 非 chrome-h2 的 profile 不受影响（nil → Do）。
 func TestDoWithTLS_NilProfileUnchanged(t *testing.T) {
-	svc := NewHTTPUpstream(&config.Config{}).(*httpUpstreamService)
+	svc, ok := NewHTTPUpstream(&config.Config{}).(*httpUpstreamService)
+	require.True(t, ok)
 	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, "http://127.0.0.1:1/", nil)
 	_, err := svc.DoWithTLS(req, "", 1, 1, nil)
 	require.Error(t, err)
