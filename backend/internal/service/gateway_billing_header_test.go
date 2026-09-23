@@ -151,7 +151,7 @@ func TestBuildOAuthRequest_BillingMatchesWireUserAgent(t *testing.T) {
 				case tc.mimic && tc.identity && !tc.disableFP:
 					wantUA = "claude-cli/2.1.900 (external, cli)"
 				case tc.mimic:
-					wantUA = claude.DefaultHeaders["User-Agent"]
+					wantUA = claude.DefaultHeaders()["User-Agent"]
 				}
 				require.Equal(t, wantUA, getHeaderRaw(req.Header, "User-Agent"))
 				version := ExtractCLIVersion(wantUA)

@@ -84,8 +84,13 @@ func (s *GatewayService) buildUpstreamRequest(ctx context.Context, c *gin.Contex
 		}
 	}
 
+	// 一致性铁律：同一次请求内只取一次 mimic UA，出站 User-Agent 头与
+	// 请求体 x-anthropic-billing-header 的 cc_version 都源自这一个字符串，
+	// 避免运行期版本缓存翻转瞬间头/体版本自相矛盾（会被判非正版客户端）。
+	mimicUserAgent := claude.DefaultUserAgent()
+
 	// Mimicry may override the cached User-Agent later, even without a fingerprint.
-	if billingUA := effectiveBillingUserAgent(tokenType, mimicClaudeCode, fingerprint); billingUA != "" {
+	if billingUA := effectiveBillingUserAgent(mimicUserAgent, tokenType, mimicClaudeCode, fingerprint); billingUA != "" {
 		body = syncBillingHeaderVersion(body, billingUA)
 	}
 
@@ -172,7 +177,7 @@ func (s *GatewayService) buildUpstreamRequest(ctx context.Context, c *gin.Contex
 	// OAuth + mimic Claude Code：强制注入 CLI 指纹相关 header
 	// （user-agent/x-stainless-*/x-app/Accept/x-stainless-helper-method/x-client-request-id）
 	if tokenType == "oauth" && mimicClaudeCode {
-		applyClaudeCodeMimicHeaders(req, reqStream)
+		applyClaudeCodeMimicHeaders(req, reqStream, mimicUserAgent)
 		// fork：账号级指纹（按账号分桶的 CLI 版本 + 注册设备 OS/Arch）必须压过全局默认头，
 		// 否则出站 UA 与 body 里按指纹同步的 cc_version 会不一致（被判第三方的信号）。
 		// 与 effectiveBillingUserAgent 的取值顺序严格对应。
@@ -423,7 +428,7 @@ func applyClaudeOAuthHeaderDefaults(req *http.Request) {
 	if getHeaderRaw(req.Header, "Accept") == "" {
 		setHeaderRaw(req.Header, "Accept", "application/json")
 	}
-	for key, value := range claude.DefaultHeaders {
+	for key, value := range claude.DefaultHeaders() {
 		if value == "" {
 			continue
 		}
@@ -860,10 +865,12 @@ var defaultDroppedBetasSet = buildBetaTokenSet(claude.DroppedBetas)
 // applyClaudeCodeMimicHeaders forces "Claude Code-like" request headers.
 // This mirrors opencode-anthropic-auth behavior: do not trust downstream
 // headers when using Claude Code-scoped OAuth credentials.
+// mimicUserAgent 由调用方在同一请求内取一次传入，保证出站 User-Agent 头与
+// 请求体 billing attribution 的 cc_version 版本号严格一致。
 //
 // 注意：调用方在有账号指纹时会紧接着再 ApplyFingerprint 一次，让指纹字段压过这里的全局默认值；
 // 本函数自身保持"无条件覆盖"语义，保证客户端透传进来的 user-agent / x-stainless-* 绝不会漏到上游。
-func applyClaudeCodeMimicHeaders(req *http.Request, isStream bool) {
+func applyClaudeCodeMimicHeaders(req *http.Request, isStream bool, mimicUserAgent string) {
 	if req == nil {
 		return
 	}
@@ -871,9 +878,13 @@ func applyClaudeCodeMimicHeaders(req *http.Request, isStream bool) {
 	applyClaudeOAuthHeaderDefaults(req)
 	// Then force key headers to match Claude Code fingerprint regardless of what the client sent.
 	// 使用 resolveWireCasing 确保 key 与真实 wire format 一致（如 "x-app" 而非 "X-App"）
-	for key, value := range claude.DefaultHeaders {
+	for key, value := range claude.DefaultHeaders() {
 		if value == "" {
 			continue
+		}
+		if key == "User-Agent" {
+			// 版本号与 billing 路径共用同一字符串（见 mimicUserAgent 注释）。
+			value = mimicUserAgent
 		}
 		setHeaderRaw(req.Header, resolveWireCasing(key), value)
 	}

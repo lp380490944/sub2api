@@ -159,3 +159,5 @@ WHERE id = <acct>;
 | 2026-09-09 | v0.2.1-ws2 | 第一层 thread 模式上线；账号 11 开启 |
 | 2026-09-10 | — | 账号 11 设 Mac UA（第二层） |
 | 2026-09-10 | v0.2.1-ws3 | 第三层 chrome-h2 传输上线（02:23）；账号 11 开启，走 socks5 → HTTP/2.0 200 |
+| 2026-09-11 | — | 抓包基线（`资料/`，本地不入库）：真实 Codex CLI 0.154 为 rustls 指纹 JA4 `t13d1009h2_61a7ad8aa9b6_f9531d972513`（10 套件含 0x00ff、11 扩展每连接随机序、无 GREASE/ECH、不发 accept-encoding）；chrome-h2 是 Chrome 形态，与 `codex-tui` UA 不自洽——待做 `codex_transport="codex-cli"` rustls 画像 + turn-metadata 键序保留 |
+| 2026-09-24 | v0.2.8-ws1 | 同步上游 v0.2.8（GPT-6 Sol/Luna、Claude 版本 GitHub 同步 `EffectiveCLIVersion`）；chrome-h2 路径改走上游 `doUpstreamRequest`（响应体 Close 取消请求 ctx），语义不变 |

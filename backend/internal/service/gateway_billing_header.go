@@ -5,7 +5,6 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/Wei-Shaw/sub2api/internal/pkg/claude"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 )
@@ -18,15 +17,16 @@ var ccVersionWithFingerprintInBillingRe = regexp.MustCompile(`cc_version=\d+\.\d
 // effectiveBillingUserAgent 返回"最终会出现在出站 User-Agent 头上"的值，供 body 里的
 // cc_version 同步使用。取值必须与 buildUpstreamRequest / buildCountTokensRequest 写头的
 // 顺序严格一致：
-//   - OAuth mimicry：先强制全局 DefaultHeaders，再用账号指纹（若有）覆盖 → 有指纹取指纹 UA，
-//     否则取 DefaultHeaders["User-Agent"]（fork：上游此处无条件取 DefaultHeaders）；
-//   - 其它：有指纹取指纹 UA，否则不同步（保留客户端自己的 billing 块）。
-func effectiveBillingUserAgent(tokenType string, mimicClaudeCode bool, fingerprint *Fingerprint) string {
+//   - fork：账号指纹存在时，调用方会在 mimic 头之后再 ApplyFingerprint 压回 → 取指纹 UA
+//     （按账号分桶版本 + 注册设备 OS/Arch）；上游此处无条件取 mimicUserAgent；
+//   - OAuth mimicry 且无指纹：取调用方同一请求内取一次的 mimicUserAgent（= DefaultUserAgent()）；
+//   - 其它：不同步（保留客户端自己的 billing 块）。
+func effectiveBillingUserAgent(mimicUserAgent, tokenType string, mimicClaudeCode bool, fingerprint *Fingerprint) string {
 	if fingerprint != nil && fingerprint.UserAgent != "" {
 		return fingerprint.UserAgent
 	}
 	if tokenType == "oauth" && mimicClaudeCode {
-		return claude.DefaultHeaders["User-Agent"]
+		return mimicUserAgent
 	}
 	return ""
 }

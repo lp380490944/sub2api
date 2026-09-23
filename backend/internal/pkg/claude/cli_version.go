@@ -3,7 +3,6 @@ package claude
 import (
 	"log/slog"
 	"os"
-	"regexp"
 	"strings"
 	"sync"
 
@@ -29,13 +28,10 @@ var resolvedCLIVersion = resolveCLIVersion(os.Getenv(CLIVersionEnv))
 //
 // 上游把版本号写死在 CLICurrentVersion，只随发版更新，实际会落后真实 CLI 数十个小版本。
 // CLIVersionTrackerService 会周期性从 npm 拉取最新版本并通过 SetCLICurrentVersion 刷新，
-// 同时同步改写 DefaultHeaders["User-Agent"]，保证 UA 与 cc_version 的一致性不变量。
+// DefaultUserAgent() 每次现取 EffectiveCLIVersion()，UA 与 cc_version 的一致性由此保证。
 var (
 	cliCurrentVersion string
 	cliVersionMu      sync.RWMutex
-
-	// uaVersionRewriteRe 用于在 DefaultHeaders["User-Agent"] 中替换版本号片段。
-	uaVersionRewriteRe = regexp.MustCompile(`claude-cli/\d+\.\d+\.\d+`)
 )
 
 // CLIVersion 返回对外伪装的 Claude Code CLI 版本号（三段 semver）。
@@ -57,7 +53,7 @@ func GetCLICurrentVersion() string {
 	return CLIVersion()
 }
 
-// SetCLICurrentVersion 更新运行时 CLI 版本号；同步刷新 DefaultHeaders["User-Agent"]。
+// SetCLICurrentVersion 更新运行时 CLI 版本号。
 // 传入空字符串视为重置为静态下限（内置基线/环境变量覆盖）。
 //
 // 只接受严格 `X.Y.Z` 且不低于静态下限的版本，否则返回 false 并保持原值：
@@ -76,9 +72,7 @@ func SetCLICurrentVersion(v string) bool {
 		return false
 	}
 	cliCurrentVersion = v
-	if ua, ok := DefaultHeaders["User-Agent"]; ok {
-		DefaultHeaders["User-Agent"] = uaVersionRewriteRe.ReplaceAllString(ua, "claude-cli/"+v)
-	}
+	// DefaultHeaders()/DefaultUserAgent() 现为按次构造（经 EffectiveCLIVersion → CLIVersion），无需回写。
 	return true
 }
 

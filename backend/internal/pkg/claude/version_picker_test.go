@@ -101,8 +101,8 @@ func TestSetCLICurrentVersion_Roundtrip(t *testing.T) {
 	if got := GetCLICurrentVersion(); got != "2.1.999" {
 		t.Errorf("after Set, got %q want 2.1.999", got)
 	}
-	if ua := DefaultHeaders["User-Agent"]; ua != "claude-cli/2.1.999 (external, cli)" {
-		t.Errorf("DefaultHeaders[User-Agent] not synced, got %q", ua)
+	if ua := DefaultHeaders()["User-Agent"]; ua != "claude-cli/2.1.999 (external, cli)" {
+		t.Errorf("DefaultHeaders()[User-Agent] not synced, got %q", ua)
 	}
 }
 
