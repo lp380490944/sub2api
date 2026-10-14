@@ -62,15 +62,15 @@ type ChromeH2RoundTripper struct {
 	insecureSkipVerify bool
 
 	h2Once sync.Once
-	h2     *http2.Transport
+	h2     *http2.Transport //nolint:staticcheck // x/net/http2 kept on purpose: NewClientConn over a uTLS conn is what gives the Chrome h2 fingerprint; http.Transport.Protocols has no such hook.
 	h2Err  error
 }
 
 // h2Transport 惰性构造一个绑定了底层 *http.Transport 的 http2.Transport：
 // Go 1.26+ 的 x/net/http2 通过 net/http 的 ClientConn 实现，NewClientConn 要求先 ConfigureTransports。
-func (t *ChromeH2RoundTripper) h2Transport() (*http2.Transport, error) {
+func (t *ChromeH2RoundTripper) h2Transport() (*http2.Transport, error) { //nolint:staticcheck // x/net/http2 kept on purpose: NewClientConn over a uTLS conn is what gives the Chrome h2 fingerprint; http.Transport.Protocols has no such hook.
 	t.h2Once.Do(func() {
-		t.h2, t.h2Err = http2.ConfigureTransports(&http.Transport{})
+		t.h2, t.h2Err = http2.ConfigureTransports(&http.Transport{}) //nolint:staticcheck // see h2 field
 	})
 	return t.h2, t.h2Err
 }
@@ -97,7 +97,7 @@ func (t *ChromeH2RoundTripper) dialTunnel(ctx context.Context, addr string) (net
 }
 
 // createConnection 拨号 → Chrome 握手 → 校验 h2 → 建 http2 ClientConn（对应 CPA createConnection）。
-func (t *ChromeH2RoundTripper) createConnection(ctx context.Context, host, addr string) (*http2.ClientConn, error) {
+func (t *ChromeH2RoundTripper) createConnection(ctx context.Context, host, addr string) (*http2.ClientConn, error) { //nolint:staticcheck // see h2 field
 	conn, err := t.dialTunnel(ctx, addr)
 	if err != nil {
 		return nil, &SetupError{Stage: "dial", Err: err}
@@ -123,7 +123,7 @@ func (t *ChromeH2RoundTripper) createConnection(ctx context.Context, host, addr 
 		_ = tlsConn.Close()
 		return nil, &SetupError{Stage: "h2", Err: err}
 	}
-	h2Conn, err := h2t.NewClientConn(tlsConn)
+	h2Conn, err := h2t.NewClientConn(tlsConn) //nolint:staticcheck // see h2 field
 	if err != nil {
 		_ = tlsConn.Close()
 		return nil, &SetupError{Stage: "h2", Err: err}
