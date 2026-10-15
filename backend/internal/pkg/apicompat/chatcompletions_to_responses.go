@@ -18,6 +18,8 @@ type chatMessageContent struct {
 // true. store is always false and reasoning.encrypted_content is always
 // included so that the response translator has full context.
 func ChatCompletionsToResponses(req *ChatCompletionsRequest) (*ResponsesRequest, error) {
+	// fork: GPT-6.1 Sol has no none/minimal level; clamp to low instead of 400.
+	req.ReasoningEffort, _ = openai.ClampGPT61SolReasoningEffort(req.Model, req.ReasoningEffort)
 	if err := openai.ValidateGPT61SolReasoningEffort(req.Model, req.ReasoningEffort); err != nil {
 		return nil, err
 	}

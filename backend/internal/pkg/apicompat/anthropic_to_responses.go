@@ -13,6 +13,7 @@ import (
 // Chat Completions intermediary round-trip (e.g. thinking, cache_control,
 // structured system prompts).
 func AnthropicToResponses(req *AnthropicRequest) (*ResponsesRequest, error) {
+	clampGPT61SolAnthropicReasoning(req)
 	if err := openai.ValidateGPT61SolReasoningEffort(req.Model, anthropicReasoningEffort(req)); err != nil {
 		return nil, err
 	}
@@ -428,6 +429,27 @@ func extractAnthropicTextFromBlocks(blocks []AnthropicContentBlock) string {
 // anthropicReasoningEffort resolves the Anthropic request preference for both
 // OpenAI bridges. Explicitly disabled thinking overrides output_config.effort;
 // otherwise the bridge keeps its medium default.
+// clampGPT61SolAnthropicReasoning (fork) turns thinking.type=disabled on a
+// GPT-6.1 Sol request into adaptive thinking at effort "low", the lowest level
+// the model accepts, instead of rejecting the request.
+func clampGPT61SolAnthropicReasoning(req *AnthropicRequest) {
+	if req == nil || !openai.IsGPT61SolModelSpelling(req.Model) {
+		return
+	}
+	if req.Thinking != nil && req.Thinking.Type == "disabled" {
+		req.Thinking = nil
+		if req.OutputConfig == nil {
+			req.OutputConfig = &AnthropicOutputConfig{}
+		}
+		if req.OutputConfig.Effort == "" {
+			req.OutputConfig.Effort = "low"
+		}
+	}
+	if req.OutputConfig != nil {
+		req.OutputConfig.Effort, _ = openai.ClampGPT61SolReasoningEffort(req.Model, req.OutputConfig.Effort)
+	}
+}
+
 func anthropicReasoningEffort(req *AnthropicRequest) string {
 	if req.Thinking != nil && req.Thinking.Type == "disabled" {
 		return "none"

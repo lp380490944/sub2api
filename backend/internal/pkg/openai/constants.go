@@ -218,6 +218,21 @@ func IsGPT61SolModelSpelling(model string) bool {
 	}
 }
 
+// ClampGPT61SolReasoningEffort (fork) rewrites the effort levels GPT-6.1 Sol
+// rejects ("none", "minimal") to its lowest supported level "low", so clients
+// tuned for GPT-6 Sol keep working instead of receiving a 400. Returns the
+// effective effort and whether a rewrite happened. Non-6.1 models pass through.
+func ClampGPT61SolReasoningEffort(model, effort string) (string, bool) {
+	if !IsGPT61SolModelSpelling(model) {
+		return effort, false
+	}
+	switch strings.ToLower(strings.TrimSpace(effort)) {
+	case "none", "minimal":
+		return "low", true
+	}
+	return effort, false
+}
+
 // ValidateGPT61SolReasoningEffort rejects disabled reasoning instead of silently
 // increasing the client's requested effort on compatibility paths.
 func ValidateGPT61SolReasoningEffort(model, effort string) error {

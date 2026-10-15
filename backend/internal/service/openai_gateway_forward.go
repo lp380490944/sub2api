@@ -397,7 +397,13 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 			logger.LegacyPrintf("service.openai_gateway", "[OpenAI] Upstream model resolved: %s -> %s (account: %s, type: %s, isCodexCLI: %v)", billingModel, upstreamModel, account.Name, account.Type, isCodexCLI)
 		}
 	}
-	if strings.TrimSpace(gjson.GetBytes(body, "reasoning.effort").String()) == "minimal" {
+	if effort := strings.TrimSpace(gjson.GetBytes(body, "reasoning.effort").String()); openai.IsGPT61SolModelSpelling(upstreamModel) {
+		// fork: GPT-6.1 Sol rejects none/minimal; clamp to low instead of a 400 upstream.
+		if mapped, ok := openai.ClampGPT61SolReasoningEffort(upstreamModel, effort); ok {
+			markPatchSet("reasoning.effort", mapped)
+			logger.LegacyPrintf("service.openai_gateway", "[OpenAI] Normalized reasoning.effort: %s -> %s for %s (account: %s)", effort, mapped, upstreamModel, account.Name)
+		}
+	} else if effort == "minimal" {
 		markPatchSet("reasoning.effort", "none")
 		logger.LegacyPrintf("service.openai_gateway", "[OpenAI] Normalized reasoning.effort: minimal -> none (account: %s)", account.Name)
 	}

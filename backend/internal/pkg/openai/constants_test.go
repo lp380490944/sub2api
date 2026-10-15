@@ -58,6 +58,18 @@ func TestGPT61SolIdentityAndEffort(t *testing.T) {
 	for _, effort := range []string{"none", "minimal"} {
 		require.Error(t, ValidateGPT61SolReasoningEffort("gpt-6.1-sol", effort))
 		require.NoError(t, ValidateGPT61SolReasoningEffort("gpt-6-sol", effort))
+		// fork: the gateway clamps these to low before validation runs.
+		mapped, ok := ClampGPT61SolReasoningEffort("gpt-6.1-sol", effort)
+		require.True(t, ok)
+		require.Equal(t, "low", mapped)
+		mapped, ok = ClampGPT61SolReasoningEffort("gpt-6-sol", effort)
+		require.False(t, ok)
+		require.Equal(t, effort, mapped)
+	}
+	for _, effort := range []string{"", "low", "high", "max"} {
+		mapped, ok := ClampGPT61SolReasoningEffort("gpt-6.1-sol", effort)
+		require.False(t, ok)
+		require.Equal(t, effort, mapped)
 	}
 	require.Contains(t, CodexBaseInstructionsForModel("gpt-6.1-sol"), "based on GPT-6")
 }

@@ -1794,17 +1794,31 @@ func TestGPT6MappedCompatibilityBridgesKeepReasoningAndTools(t *testing.T) {
 }
 
 func TestGPT61SolRejectsDisabledReasoningBeforeForwarding(t *testing.T) {
-	for _, body := range []string{
-		`{"model":"public","reasoning_effort":"none"}`,
-		`{"model":"public","reasoning":{"effort":"minimal"}}`,
-		`{"model":"public","output_config":{"effort":"none"}}`,
-		`{"model":"public","thinking":{"type":"disabled"}}`,
-		`{"model":"gpt-6.1-sol-minimal"}`,
+	// fork: disabled/minimal reasoning on GPT-6.1 Sol is clamped to low instead
+	// of rejected; the upstream validator still rejects the raw bodies.
+	for body, path := range map[string]string{
+		`{"model":"public","reasoning_effort":"none"}`:         "reasoning_effort",
+		`{"model":"public","reasoning":{"effort":"minimal"}}`:  "reasoning.effort",
+		`{"model":"public","output_config":{"effort":"none"}}`: "output_config.effort",
+		`{"model":"public","thinking":{"type":"disabled"}}`:    "output_config.effort",
 	} {
 		require.Error(t, validateGPT61SolCompatRequest([]byte(body), "gpt-6.1-sol"))
 		require.NoError(t, validateGPT61SolCompatRequest([]byte(body), "gpt-6-sol"))
+		out, err := normalizeGPT61SolCompatRequest([]byte(body), "gpt-6.1-sol")
+		require.NoError(t, err)
+		require.Equal(t, "low", gjson.GetBytes(out, path).String(), body)
+		require.False(t, gjson.GetBytes(out, "thinking").Exists(), body)
+		unchanged, err := normalizeGPT61SolCompatRequest([]byte(body), "gpt-6-sol")
+		require.NoError(t, err)
+		require.JSONEq(t, body, string(unchanged))
 	}
-	for _, field := range []string{`"reasoning_effort":"none"`, `"reasoning_effort":"minimal"`, `"tools":[{"type":"function","function":{"name":"lookup"}}]`} {
+	out, err := normalizeGPT61SolCompatRequest([]byte(`{"model":"gpt-6.1-sol-minimal"}`), "gpt-6.1-sol")
+	require.NoError(t, err)
+	require.Equal(t, "gpt-6.1-sol-low", gjson.GetBytes(out, "model").String())
+	out, err = normalizeGPT61SolCompatRequest([]byte(`{"model":"public","reasoning_effort":"high"}`), "gpt-6.1-sol")
+	require.NoError(t, err)
+	require.Equal(t, "high", gjson.GetBytes(out, "reasoning_effort").String())
+	for _, field := range []string{`"tools":[{"type":"function","function":{"name":"lookup"}}]`} {
 		body := []byte(`{"model":"public",` + field + `,"messages":[{"role":"user","content":"hello"}]}`)
 		rec := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(rec)
@@ -1836,25 +1850,29 @@ func TestGPT61SolMessagesEffortAliasesPreserveIntent(t *testing.T) {
 		applyOpenAICompatModelNormalization(req)
 		require.Equal(t, "gpt-6.1-sol", req.Model)
 		require.Equal(t, effort, req.OutputConfig.Effort)
-		_, err := apicompat.AnthropicToResponses(req)
-		if effort == "none" || effort == "minimal" {
-			require.Error(t, err)
-		} else {
-			require.NoError(t, err)
+		out, err := apicompat.AnthropicToResponses(req)
+		require.NoError(t, err)
+		switch effort {
+		case "none", "minimal":
+			// fork: clamped to the lowest level GPT-6.1 Sol accepts.
+			require.Equal(t, "low", out.Reasoning.Effort)
+		default:
+			require.Equal(t, effort, out.Reasoning.Effort)
 		}
 	}
 }
 
 func TestGPT61SolOnlyChatFallbackRejectsToolsAndDisabledReasoning(t *testing.T) {
 	for _, responses := range []bool{false, true} {
+		// fork: disabled reasoning is clamped to low (see
+		// TestGPT61SolRejectsDisabledReasoningBeforeForwarding); only tools
+		// still require Responses and are rejected on a Chat-only account.
 		bodies := []string{
 			`{"model":"public","max_tokens":100,"messages":[{"role":"user","content":"hi"}],"tools":[{"name":"lookup","input_schema":{"type":"object"}}]}`,
-			`{"model":"public","max_tokens":100,"messages":[{"role":"user","content":"hi"}],"thinking":{"type":"disabled"}}`,
 		}
 		if responses {
 			bodies = []string{
 				`{"model":"public","input":"hi","tools":[{"type":"function","name":"lookup","parameters":{"type":"object"}}]}`,
-				`{"model":"public","input":"hi","reasoning":{"effort":"none"}}`,
 			}
 		}
 		for _, body := range bodies {

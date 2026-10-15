@@ -2597,6 +2597,59 @@ func supportsOpenAIReasoningEffortMax(model string) bool {
 	}
 }
 
+// normalizeGPT61SolCompatRequest (fork) rewrites disabled/minimal reasoning on
+// GPT-6.1 Sol requests to effort "low" before validation, covering
+// reasoning.effort / reasoning_effort / output_config.effort, Anthropic
+// thinking.type=disabled, and canonical "-none"/"-minimal" model suffixes.
+// Anything still invalid afterwards is reported by validateGPT61SolCompatRequest.
+func normalizeGPT61SolCompatRequest(body []byte, model string) ([]byte, error) {
+	if !openai.IsGPT61SolModelSpelling(model) {
+		return body, nil
+	}
+	out := body
+	for _, path := range []string{"reasoning.effort", "reasoning_effort", "output_config.effort"} {
+		raw := gjson.GetBytes(out, path)
+		if !raw.Exists() {
+			continue
+		}
+		if mapped, ok := openai.ClampGPT61SolReasoningEffort(model, raw.String()); ok {
+			next, err := sjson.SetBytes(out, path, mapped)
+			if err != nil {
+				return body, fmt.Errorf("normalize GPT-6.1 %s: %w", path, err)
+			}
+			out = next
+		}
+	}
+	if gjson.GetBytes(out, "thinking.type").String() == "disabled" {
+		next, err := sjson.DeleteBytes(out, "thinking")
+		if err != nil {
+			return body, fmt.Errorf("normalize GPT-6.1 thinking: %w", err)
+		}
+		out = next
+		if !gjson.GetBytes(out, "output_config.effort").Exists() {
+			next, err = sjson.SetBytes(out, "output_config.effort", "low")
+			if err != nil {
+				return body, fmt.Errorf("normalize GPT-6.1 output_config.effort: %w", err)
+			}
+			out = next
+		}
+	}
+	requestedModel := gjson.GetBytes(out, "model").String()
+	if canonical := openai.CanonicalizeOpenAIModelAliasSpelling(requestedModel); openai.IsGPT61SolModelSpelling(canonical) {
+		for _, effort := range []string{"none", "minimal"} {
+			if strings.HasSuffix(canonical, "-"+effort) {
+				next, err := sjson.SetBytes(out, "model", "gpt-6.1-sol-low")
+				if err != nil {
+					return body, fmt.Errorf("normalize GPT-6.1 model suffix: %w", err)
+				}
+				out = next
+				break
+			}
+		}
+	}
+	return out, validateGPT61SolCompatRequest(out, model)
+}
+
 // validateGPT61SolCompatRequest runs after model mapping, before conversion can
 // discard unsupported explicit effort selections or disabled thinking.
 func validateGPT61SolCompatRequest(body []byte, model string) error {

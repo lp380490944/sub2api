@@ -2057,4 +2057,14 @@ func TestGPT61SolCacheOptionsAndBreakpointsSurviveChatBridge(t *testing.T) {
 		require.JSONEq(t, `{"ttl":"30m","mode":"explicit"}`, string(out.PromptCacheOptions))
 		require.Contains(t, string(out.Input), "prompt_cache_breakpoint")
 	}
+	// fork: none/minimal are clamped to low rather than rejected.
+	for _, effort := range []string{"none", "minimal"} {
+		out, err := ChatCompletionsToResponses(&ChatCompletionsRequest{Model: "gpt-6.1-sol", ReasoningEffort: effort, Temperature: &sampling, Messages: []ChatMessage{{Role: "user", Content: json.RawMessage(`"hi"`)}}})
+		require.NoError(t, err)
+		require.Equal(t, "low", out.Reasoning.Effort)
+		require.Nil(t, out.Temperature)
+		out, err = AnthropicToResponses(&AnthropicRequest{Model: "gpt-6.1-sol", Thinking: &AnthropicThinking{Type: "disabled"}, Messages: []AnthropicMessage{{Role: "user", Content: json.RawMessage(`"hi"`)}}})
+		require.NoError(t, err)
+		require.Equal(t, "low", out.Reasoning.Effort)
+	}
 }
