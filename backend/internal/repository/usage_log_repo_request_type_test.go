@@ -90,6 +90,7 @@ func TestUsageLogRepositoryCreateSyncRequestTypeAndLegacyFields(t *testing.T) {
 			sqlmock.AnyArg(), // service_tier
 			sqlmock.AnyArg(), // reasoning_effort
 			sqlmock.AnyArg(), // requested_reasoning_effort
+			sqlmock.AnyArg(), // reasoning_tokens
 			sqlmock.AnyArg(), // inbound_endpoint
 			sqlmock.AnyArg(), // upstream_endpoint
 			log.CacheTTLOverridden,
@@ -185,6 +186,7 @@ func TestUsageLogRepositoryCreate_PersistsServiceTier(t *testing.T) {
 			serviceTier,
 			sqlmock.AnyArg(), // reasoning_effort
 			sqlmock.AnyArg(), // requested_reasoning_effort
+			sqlmock.AnyArg(), // reasoning_tokens
 			sqlmock.AnyArg(), // inbound_endpoint
 			sqlmock.AnyArg(), // upstream_endpoint
 			log.CacheTTLOverridden,
@@ -948,6 +950,7 @@ func TestScanUsageLogRequestTypeAndLegacyFallback(t *testing.T) {
 			sql.NullString{},
 			sql.NullString{},
 			sql.NullString{},
+			sql.NullInt64{}, // reasoning_tokens
 			sql.NullString{},
 			sql.NullString{},
 			false,
@@ -1028,6 +1031,7 @@ func TestScanUsageLogRequestTypeAndLegacyFallback(t *testing.T) {
 			sql.NullString{Valid: true, String: "priority"},
 			sql.NullString{},
 			sql.NullString{},
+			sql.NullInt64{}, // reasoning_tokens
 			sql.NullString{},
 			sql.NullString{},
 			false,
@@ -1091,6 +1095,7 @@ func TestScanUsageLogRequestTypeAndLegacyFallback(t *testing.T) {
 			sql.NullString{Valid: true, String: "flex"},
 			sql.NullString{},
 			sql.NullString{},
+			sql.NullInt64{}, // reasoning_tokens
 			sql.NullString{},
 			sql.NullString{},
 			false,
@@ -1155,6 +1160,7 @@ func TestScanUsageLogRequestTypeAndLegacyFallback(t *testing.T) {
 			sql.NullString{Valid: true, String: "priority"},
 			sql.NullString{},
 			sql.NullString{},
+			sql.NullInt64{}, // reasoning_tokens
 			sql.NullString{},
 			sql.NullString{},
 			false,

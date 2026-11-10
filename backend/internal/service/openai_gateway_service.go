@@ -229,6 +229,10 @@ type OpenAIUsage struct {
 	CacheCreationInputTokens int `json:"cache_creation_input_tokens,omitempty"`
 	CacheReadInputTokens     int `json:"cache_read_input_tokens,omitempty"`
 	ImageOutputTokens        int `json:"image_output_tokens,omitempty"`
+	// ReasoningTokens is the upstream-reported reasoning token count
+	// (output_tokens_details / completion_tokens_details). Informational only:
+	// OutputTokens already carries the billable output (incl. reasoning).
+	ReasoningTokens int `json:"reasoning_tokens,omitempty"`
 }
 
 // OpenAIForwardResult represents the result of forwarding

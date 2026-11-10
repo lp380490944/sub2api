@@ -31,6 +31,9 @@ type Usage struct {
 	CacheCreationInputTokens int
 	CacheReadInputTokens     int
 	ImageOutputTokens        int
+	// ReasoningTokens is the upstream-reported reasoning token count
+	// (informational; OutputTokens already carries billable output).
+	ReasoningTokens int
 }
 
 type RelayResult struct {
@@ -1162,6 +1165,7 @@ func parseUsageAndAccumulate(
 		CacheCreationInputTokens: openAICacheCreationTokensFromUsage(usageResult),
 		CacheReadInputTokens:     cachedTokens,
 		ImageOutputTokens:        int(imageTokens),
+		ReasoningTokens:          int(max(reasoningTokens, 0)),
 	}
 
 	if isTerminalEvent(strings.TrimSpace(eventType)) {
@@ -1203,6 +1207,9 @@ func mergeRelayUsageNonZero(dst *Usage, src Usage) {
 	if src.ImageOutputTokens > 0 {
 		dst.ImageOutputTokens = src.ImageOutputTokens
 	}
+	if src.ReasoningTokens > 0 {
+		dst.ReasoningTokens = src.ReasoningTokens
+	}
 }
 
 func finalizeRelayTurnUsage(state *relayState) Usage {
@@ -1216,6 +1223,7 @@ func finalizeRelayTurnUsage(state *relayState) Usage {
 	state.usage.CacheCreationInputTokens += turnUsage.CacheCreationInputTokens
 	state.usage.CacheReadInputTokens += turnUsage.CacheReadInputTokens
 	state.usage.ImageOutputTokens += turnUsage.ImageOutputTokens
+	state.usage.ReasoningTokens += turnUsage.ReasoningTokens
 	state.turnUsage = Usage{}
 	return turnUsage
 }
