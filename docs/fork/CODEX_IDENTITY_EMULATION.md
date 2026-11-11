@@ -79,6 +79,24 @@ WHERE id = <acct>;
 -- 回滚：UPDATE accounts SET credentials = credentials - 'user_agent' WHERE id = <acct>;
 ```
 
+### 2.1 逐账号灰度：`extra.codex_identity`（v0.2.21 同步引入）
+
+上游 `c591412c4`（v0.2.19 起）把网关默认身份从 `codex-tui` 改成 `codex_cli_rs`，并在 `resolveCodexOutboundIdentity` 里把一切 `codex-tui` 身份（含账号级 UA）强制归一为 CLI（理由：上游 #5198 记录 `codex-tui` 会收到 `server_is_overloaded`）。这会让所有订阅账号的 originator / UA 首段同时变化，因此 fork 加了账号级开关（`openai_codex_identity_legacy.go`）：
+
+| `extra.codex_identity` | 出站身份 |
+|---|---|
+| `"tui"` | 保持合并前行为：不归一；未配 UA 时默认身份为 `codex-tui/<ver> (Ubuntu 22.4.0; x86_64) xterm-256color`；账号 UA 按原样配对 |
+| 缺省 / 其它值 | 跟随上游：`codex_cli_rs`，TUI UA 被归一为 CLI |
+
+覆盖路径：HTTP 转发、透传、WS、Messages 桥接、alpha search、用量查询、模型列表、插件身份、Live。已用同一组输入对比 v0.2.16-ws2 与本版（带标记）的 originator / UA / version，逐字节一致。
+
+```sql
+-- 发布前给现有订阅账号打标记（旧版本二进制忽略该字段，可提前写入）
+UPDATE accounts SET extra = jsonb_set(COALESCE(extra,'{}'::jsonb), '{codex_identity}', '"tui"'), updated_at = now() WHERE id IN (<accts>);
+-- 灰度某个账号到 CLI 身份：UPDATE accounts SET extra = extra - 'codex_identity', updated_at = now() WHERE id = <acct>;
+-- 两种操作之后都要写 scheduler_outbox 的 account_changed 事件刷新调度快照
+```
+
 ---
 
 ## 3. 第三层：传输层（`codex_transport = "chrome-h2"`）
@@ -163,3 +181,4 @@ WHERE id = <acct>;
 | 2026-09-24 | v0.2.8-ws1 | 同步上游 v0.2.8（GPT-6 Sol/Luna、Claude 版本 GitHub 同步 `EffectiveCLIVersion`）；chrome-h2 路径改走上游 `doUpstreamRequest`（响应体 Close 取消请求 ctx），语义不变 |
 | 2026-10-14 | v0.2.16-ws1 | 同步上游 v0.2.16（399 commits：GPT-6.1 Sol 官方描述符/定价/`none`·`minimal` 本地拒绝、Haiku 5.5、余额在途预占、API Key 创建限额、迁移 241–245 均为加列/建表）。冲突 6 处全是"两边各加一段"：wire/wire_gen 保留 fork `CLIVersionTracker` 注入、`codexOAuthTransformOptions` 同时保留 fork `StripReasoningContent` 与上游 `ResponsesLite`、GPT-6 指令 switch 保留 #7528 的 Sol/Luna 分支（上游仍未合并 #7528）。fork 三层身份代码（thread / UA / chrome-h2）无改动 |
 | 2026-10-15 | v0.2.16-ws2 | fork 补丁：GPT-6.1 Sol 的 `reasoning_effort`/`reasoning.effort`/`output_config.effort` 为 `none`/`minimal`、`thinking.type=disabled`、模型后缀 `-none/-minimal` 一律改写成 `low` 再转上游（上游 v0.2.16 是本地 400 拒绝）；`openai.ClampGPT61SolReasoningEffort` + `normalizeGPT61SolCompatRequest`，五个入口与 apicompat、原生 Responses 路径同步。身份层无改动 |
+| 2026-11-11 | v0.2.21-ws1（待发布） | 同步上游 v0.2.21（358 commits：Claude Fable/Mythos 5.2、GPT-6.1 Terra、推理强度映射策略、WS 首字计时、Responses 会话种子稳定、迁移见 `backend/migrations`）。冲突 16 个文件。**撤销 v0.2.16-ws2 的 GPT-6.1 Sol effort 改写**，回到上游本地 400（不擅自改写出站请求）。上游默认 Codex 身份改为 `codex_cli_rs` 并强制归一 TUI：fork 新增 `extra.codex_identity="tui"` 逐账号保留旧身份（§2.1），发布前须给现有订阅账号打标记。`cli_version_tracker` 测试版本号上调以高于上游新内置版本 2.1.321 |

@@ -30,7 +30,8 @@ func threadTestAccount(id int64, seed string) *Account {
 	return &Account{
 		ID: id, Name: "thread-test", Platform: PlatformOpenAI, Type: AccountTypeOAuth, Concurrency: 5,
 		Credentials: map[string]any{"access_token": "tok", "chatgpt_account_id": "acct-uuid", "chatgpt_user_id": "user-uuid"},
-		Extra:       map[string]any{"codex_fingerprint_mode": "thread", "codex_fingerprint_seed": seed},
+		// codex_identity=tui：与线上订阅账号一致，保持合并前的 codex-tui 身份（见 openai_codex_identity_legacy.go）。
+		Extra: map[string]any{"codex_fingerprint_mode": "thread", "codex_fingerprint_seed": seed, "codex_identity": "tui"},
 	}
 }
 

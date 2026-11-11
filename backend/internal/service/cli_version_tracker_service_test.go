@@ -136,16 +136,16 @@ func TestRunOnce_FetchAndPersist(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]string{"latest": "2.1.300", "beta": "2.2.0-beta.1"})
+		_ = json.NewEncoder(w).Encode(map[string]string{"latest": "2.8.300", "beta": "2.2.0-beta.1"})
 	}))
 	t.Cleanup(server.Close)
 
 	repo := newCLITrackerFakeSettingRepo(map[string]string{
-		SettingKeyCLICurrentVersion: "2.1.299",
-		SettingKeyCLIRecentVersions: `["2.1.299","2.1.298"]`,
+		SettingKeyCLICurrentVersion: "2.8.299",
+		SettingKeyCLIRecentVersions: `["2.8.299","2.8.298"]`,
 	})
-	// 先把全局 var 调到 2.1.299，让 runOnce 检测到 latest=2.1.300 是升级
-	claude.SetCLICurrentVersion("2.1.299")
+	// 先把全局 var 调到 2.8.299，让 runOnce 检测到 latest=2.8.300 是升级
+	claude.SetCLICurrentVersion("2.8.299")
 
 	svc := NewCLIVersionTrackerService(repo, config.CLIVersionTrackerConfig{
 		Enabled:           false,
@@ -155,11 +155,11 @@ func TestRunOnce_FetchAndPersist(t *testing.T) {
 	})
 	svc.runOnce(context.Background())
 
-	require.Equal(t, "2.1.300", claude.GetCLICurrentVersion())
-	require.Equal(t, "2.1.300", repo.store[SettingKeyCLICurrentVersion])
+	require.Equal(t, "2.8.300", claude.GetCLICurrentVersion())
+	require.Equal(t, "2.8.300", repo.store[SettingKeyCLICurrentVersion])
 	var recent []string
 	require.NoError(t, json.Unmarshal([]byte(repo.store[SettingKeyCLIRecentVersions]), &recent))
-	require.Equal(t, []string{"2.1.300", "2.1.299", "2.1.298"}, recent)
+	require.Equal(t, []string{"2.8.300", "2.8.299", "2.8.298"}, recent)
 	require.Equal(t, recent, GetCachedRecentVersions())
 }
 

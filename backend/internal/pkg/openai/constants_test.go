@@ -28,9 +28,11 @@ func TestDefaultModelsPreferConcreteGPT56SolForAccountTests(t *testing.T) {
 	require.Equal(t, "gpt-5.6-sol", DefaultModels[0].ID)
 }
 
-func TestDefaultModelsIncludeGPTImage25(t *testing.T) {
+func TestDefaultModelsIncludeGPTImage25And26(t *testing.T) {
 	require.Contains(t, DefaultModelIDs(), "gpt-image-2.5-flare")
 	require.Contains(t, DefaultModelIDs(), "gpt-image-2.5-sunburst")
+	require.Contains(t, DefaultModelIDs(), "gpt-image-2.6-flare")
+	require.Contains(t, DefaultModelIDs(), "gpt-image-2.6-sunburst")
 }
 
 func TestGPT6SolLunaModelIdentity(t *testing.T) {
@@ -58,18 +60,6 @@ func TestGPT61SolIdentityAndEffort(t *testing.T) {
 	for _, effort := range []string{"none", "minimal"} {
 		require.Error(t, ValidateGPT61SolReasoningEffort("gpt-6.1-sol", effort))
 		require.NoError(t, ValidateGPT61SolReasoningEffort("gpt-6-sol", effort))
-		// fork: the gateway clamps these to low before validation runs.
-		mapped, ok := ClampGPT61SolReasoningEffort("gpt-6.1-sol", effort)
-		require.True(t, ok)
-		require.Equal(t, "low", mapped)
-		mapped, ok = ClampGPT61SolReasoningEffort("gpt-6-sol", effort)
-		require.False(t, ok)
-		require.Equal(t, effort, mapped)
-	}
-	for _, effort := range []string{"", "low", "high", "max"} {
-		mapped, ok := ClampGPT61SolReasoningEffort("gpt-6.1-sol", effort)
-		require.False(t, ok)
-		require.Equal(t, effort, mapped)
 	}
 	require.Contains(t, CodexBaseInstructionsForModel("gpt-6.1-sol"), "based on GPT-6")
 }

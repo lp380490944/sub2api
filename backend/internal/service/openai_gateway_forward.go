@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/httputil"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/openai"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/openai_compat"
@@ -33,6 +34,7 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 	clearOpenAIResponsesClientToolMapping(c)
 	clearOpenAIResponsesNamespaceNames(c)
 	setCodexToolNameReverse(c, nil)
+	rememberOpenAIResponsesClientInstructions(c, body)
 	if _, err := s.prepareCodexAccountIdentitySource(ctx, c, account); err != nil {
 		return nil, err
 	}
@@ -65,7 +67,7 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 	if normalized {
 		body = normalizedBody
 	}
-	legacyIngressBody, legacyIngressChanged, legacyIngressErr := normalizeOpenAIResponsesLegacyIngress(body)
+	legacyIngressBody, legacyIngressChanged, legacyIngressErr := normalizeOpenAIResponsesLegacyIngressWithConfig(s.cfg, body)
 	if legacyIngressErr != nil {
 		return nil, legacyIngressErr
 	}
@@ -290,16 +292,45 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 	bodyModified := false
 	clientPromptCacheKey := promptCacheKey
 	var reqBody map[string]any
-	ensureReqBody := func() (map[string]any, error) {
-		if requestView.HasPatches() {
-			patchedBody, patchErr := requestView.ApplyPatches()
-			if patchErr != nil {
-				return nil, patchErr
-			}
+	// Each patched body supersedes the previous one, so this attempt holds only
+	// the live output's budget, returned when Forward ends rather than retained
+	// across failover attempts until the handler returns.
+	releasePatchedBodyMemory := func() {}
+	defer func() { releasePatchedBodyMemory() }()
+	flushPatches := func() error {
+		if !requestView.HasPatches() {
+			return nil
+		}
+		patchCtx, releasePatch := httputil.WithRequestBodyMemoryScope(ctx)
+		patchedBody, patchErr := requestView.ApplyPatches(patchCtx)
+		if patchErr == nil {
+			releasePatchedBodyMemory()
+			releasePatchedBodyMemory = releasePatch
 			body = patchedBody
 			requestView = newOpenAIRequestView(body)
 			reqBody = nil
 			bodyModified = false
+			return nil
+		}
+		releasePatch()
+		if errors.Is(patchErr, httputil.ErrRequestBodyMemoryBudget) {
+			return patchErr
+		}
+		// Raw edits cannot express this patch set. Replay it on the decoded
+		// body so the map-based fallback still applies every edit.
+		if reqBody == nil {
+			decoded, decodeErr := requestView.Decode(c)
+			if decodeErr != nil {
+				return decodeErr
+			}
+			reqBody = decoded
+		}
+		requestView.MovePatchesTo(reqBody)
+		return nil
+	}
+	ensureReqBody := func() (map[string]any, error) {
+		if err := flushPatches(); err != nil {
+			return nil, err
 		}
 		if reqBody != nil {
 			return reqBody, nil
@@ -397,13 +428,7 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 			logger.LegacyPrintf("service.openai_gateway", "[OpenAI] Upstream model resolved: %s -> %s (account: %s, type: %s, isCodexCLI: %v)", billingModel, upstreamModel, account.Name, account.Type, isCodexCLI)
 		}
 	}
-	if effort := strings.TrimSpace(gjson.GetBytes(body, "reasoning.effort").String()); openai.IsGPT61SolModelSpelling(upstreamModel) {
-		// fork: GPT-6.1 Sol rejects none/minimal; clamp to low instead of a 400 upstream.
-		if mapped, ok := openai.ClampGPT61SolReasoningEffort(upstreamModel, effort); ok {
-			markPatchSet("reasoning.effort", mapped)
-			logger.LegacyPrintf("service.openai_gateway", "[OpenAI] Normalized reasoning.effort: %s -> %s for %s (account: %s)", effort, mapped, upstreamModel, account.Name)
-		}
-	} else if effort == "minimal" {
+	if strings.TrimSpace(gjson.GetBytes(body, "reasoning.effort").String()) == "minimal" {
 		markPatchSet("reasoning.effort", "none")
 		logger.LegacyPrintf("service.openai_gateway", "[OpenAI] Normalized reasoning.effort: minimal -> none (account: %s)", account.Name)
 	}
@@ -720,13 +745,8 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 	}
 
 	if bodyModified {
-		if requestView.HasPatches() {
-			if patchedBody, patchErr := requestView.ApplyPatches(); patchErr == nil {
-				body = patchedBody
-				requestView = newOpenAIRequestView(body)
-				reqBody = nil
-				bodyModified = false
-			}
+		if err := flushPatches(); err != nil {
+			return nil, err
 		}
 		if bodyModified {
 			decoded, decodeErr := ensureReqBody()
@@ -1057,6 +1077,7 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 				upstreamCtx, releaseUpstreamCtx, startTime.Add(firstOutputTimeout),
 			)
 		}
+		syncOpenAIResponsesInstructionsEcho(c, body)
 		upstreamReq, err := s.buildUpstreamRequest(upstreamCtx, c, account, body, token, reqStream, promptCacheKey, isCodexCLI)
 		if headerGuard == nil {
 			releaseUpstreamCtx()
@@ -1222,7 +1243,7 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 			if s.cfg != nil && s.cfg.Gateway.MaxLineSize > 0 {
 				maxLineSize = s.cfg.Gateway.MaxLineSize
 			}
-			resp.Body = newResponsesClientToolStreamBody(resp.Body, mapping, maxLineSize)
+			resp.Body = newResponsesClientToolStreamBody(resp.Body, mapping, maxLineSize, s.cfg)
 		}
 
 		serviceTier := extractOpenAIServiceTierFromBody(body)
@@ -1553,7 +1574,7 @@ func (s *OpenAIGatewayService) buildUpstreamRequest(ctx context.Context, c *gin.
 // 该优先级与历史行为一致（ForceCodexCLI 在账号自定义 UA 之后生效）。
 func (s *OpenAIGatewayService) codexIdentityOverrideUA(account *Account) string {
 	if s != nil && s.cfg != nil && s.cfg.Gateway.ForceCodexCLI {
-		return ""
+		return codexLegacyTUICandidate(account, "") // fork
 	}
-	return account.GetOpenAIUserAgent()
+	return codexLegacyTUICandidate(account, account.GetOpenAIUserAgent()) // fork
 }

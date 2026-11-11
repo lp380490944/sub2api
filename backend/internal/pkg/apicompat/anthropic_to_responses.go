@@ -13,9 +13,28 @@ import (
 // Chat Completions intermediary round-trip (e.g. thinking, cache_control,
 // structured system prompts).
 func AnthropicToResponses(req *AnthropicRequest) (*ResponsesRequest, error) {
-	clampGPT61SolAnthropicReasoning(req)
-	if err := openai.ValidateGPT61SolReasoningEffort(req.Model, anthropicReasoningEffort(req)); err != nil {
-		return nil, err
+	return AnthropicToResponsesWithMinOutputTokens(req, DefaultMinMaxOutputTokens)
+}
+
+// AnthropicToResponsesWithMinOutputTokens converts an Anthropic request using
+// the supplied max_output_tokens floor.
+func AnthropicToResponsesWithMinOutputTokens(req *AnthropicRequest, minOutputTokens int) (*ResponsesRequest, error) {
+	return AnthropicToResponsesWithOptions(req, AnthropicToResponsesOptions{MinOutputTokens: minOutputTokens})
+}
+
+// AnthropicToResponsesOptions controls conversion and optional deferred effort
+// validation. Callers deferring validation must validate raw selections before
+// conversion and the final effort after applying their policy.
+type AnthropicToResponsesOptions struct {
+	MinOutputTokens                int
+	DeferReasoningEffortValidation bool
+}
+
+func AnthropicToResponsesWithOptions(req *AnthropicRequest, options AnthropicToResponsesOptions) (*ResponsesRequest, error) {
+	if !options.DeferReasoningEffortValidation {
+		if err := openai.ValidateGPT61ReasoningEffort(req.Model, anthropicReasoningEffort(req)); err != nil {
+			return nil, err
+		}
 	}
 	input, err := convertAnthropicToResponsesInput(req.System, req.Messages)
 	if err != nil {
@@ -51,8 +70,8 @@ func AnthropicToResponses(req *AnthropicRequest) (*ResponsesRequest, error) {
 
 	if req.MaxTokens > 0 {
 		v := req.MaxTokens
-		if v < minMaxOutputTokens {
-			v = minMaxOutputTokens
+		if v < options.MinOutputTokens {
+			v = options.MinOutputTokens
 		}
 		out.MaxOutputTokens = &v
 	}
@@ -63,7 +82,7 @@ func AnthropicToResponses(req *AnthropicRequest) (*ResponsesRequest, error) {
 
 	// An explicit thinking disable takes precedence over output_config.effort.
 	effort := anthropicReasoningEffort(req)
-	if openai.IsGPT61SolModelSpelling(req.Model) && req.OutputConfig != nil && req.OutputConfig.Effort == "max" && effort != "none" {
+	if (openai.IsGPT61SolModelSpelling(req.Model) || openai.IsGPT61TerraModelSpelling(req.Model)) && req.OutputConfig != nil && req.OutputConfig.Effort == "max" && effort != "none" {
 		effort = "max"
 	}
 	out.Reasoning = &ResponsesReasoning{
@@ -297,6 +316,11 @@ func anthropicAssistantToResponses(raw json.RawMessage) ([]ResponsesInputItem, e
 		if sig == "" || strings.HasPrefix(sig, "gAAAA") {
 			continue
 		}
+		// CC Switch carries a JSON reasoning item in this versioned envelope,
+		// not provider ciphertext. Ignore the foreign state when resuming directly.
+		if strings.HasPrefix(sig, "ccswitch-openai-reasoning-v1:") {
+			continue
+		}
 		items = append(items, ResponsesInputItem{
 			Type:             "reasoning",
 			EncryptedContent: sig,
@@ -429,27 +453,6 @@ func extractAnthropicTextFromBlocks(blocks []AnthropicContentBlock) string {
 // anthropicReasoningEffort resolves the Anthropic request preference for both
 // OpenAI bridges. Explicitly disabled thinking overrides output_config.effort;
 // otherwise the bridge keeps its medium default.
-// clampGPT61SolAnthropicReasoning (fork) turns thinking.type=disabled on a
-// GPT-6.1 Sol request into adaptive thinking at effort "low", the lowest level
-// the model accepts, instead of rejecting the request.
-func clampGPT61SolAnthropicReasoning(req *AnthropicRequest) {
-	if req == nil || !openai.IsGPT61SolModelSpelling(req.Model) {
-		return
-	}
-	if req.Thinking != nil && req.Thinking.Type == "disabled" {
-		req.Thinking = nil
-		if req.OutputConfig == nil {
-			req.OutputConfig = &AnthropicOutputConfig{}
-		}
-		if req.OutputConfig.Effort == "" {
-			req.OutputConfig.Effort = "low"
-		}
-	}
-	if req.OutputConfig != nil {
-		req.OutputConfig.Effort, _ = openai.ClampGPT61SolReasoningEffort(req.Model, req.OutputConfig.Effort)
-	}
-}
-
 func anthropicReasoningEffort(req *AnthropicRequest) string {
 	if req.Thinking != nil && req.Thinking.Type == "disabled" {
 		return "none"
