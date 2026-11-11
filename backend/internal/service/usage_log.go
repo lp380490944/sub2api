@@ -139,6 +139,12 @@ type UsageLog struct {
 	// RequestedReasoningEffort is the client-requested effort before mapping.
 	// Nil means historical rows, or that no explicit/suffix-derived effort was observed.
 	RequestedReasoningEffort *string
+	// ReasoningTokens is the upstream-reported reasoning token count
+	// (OpenAI output_tokens_details.reasoning_tokens /
+	// completion_tokens_details.reasoning_tokens). Informational only: billing
+	// keeps using OutputTokens. Nil means unknown, zero, or not applicable
+	// (e.g. Anthropic paths).
+	ReasoningTokens *int
 	// InboundEndpoint is the client-facing API endpoint path, e.g. /v1/chat/completions.
 	InboundEndpoint *string
 	// UpstreamEndpoint is the normalized upstream endpoint path, e.g. /v1/responses.

@@ -42,3 +42,12 @@ func optionalInt64Ptr(v int64) *int64 {
 	}
 	return &v
 }
+
+// optionalPositiveIntPtr returns nil for zero/negative values so that unknown
+// counters (e.g. reasoning_tokens) persist as NULL instead of 0.
+func optionalPositiveIntPtr(v int) *int {
+	if v <= 0 {
+		return nil
+	}
+	return &v
+}

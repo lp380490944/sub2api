@@ -332,3 +332,29 @@ func TestUsageLogFromService_PreservesHistoricalMissingImageSize(t *testing.T) {
 func f64Ptr(value float64) *float64 {
 	return &value
 }
+
+func TestUsageLogFromServiceAdmin_ReasoningTokens(t *testing.T) {
+	t.Parallel()
+
+	reasoning := 2048
+	log := &service.UsageLog{
+		RequestID:       "req_rt_admin",
+		Model:           "gpt-5.4",
+		ReasoningTokens: &reasoning,
+	}
+
+	adminDTO := UsageLogFromServiceAdmin(log)
+	require.NotNil(t, adminDTO.ReasoningTokens)
+	require.Equal(t, reasoning, *adminDTO.ReasoningTokens)
+	adminJSON, err := json.Marshal(adminDTO)
+	require.NoError(t, err)
+	require.Contains(t, string(adminJSON), `"reasoning_tokens":2048`)
+
+	userJSON, err := json.Marshal(UsageLogFromService(log))
+	require.NoError(t, err)
+	require.NotContains(t, string(userJSON), `"reasoning_tokens"`, "reasoning_tokens is admin-only")
+
+	emptyJSON, err := json.Marshal(UsageLogFromServiceAdmin(&service.UsageLog{RequestID: "req_none", Model: "gpt-5.4"}))
+	require.NoError(t, err)
+	require.NotContains(t, string(emptyJSON), `"reasoning_tokens"`, "unknown reasoning tokens omitted")
+}

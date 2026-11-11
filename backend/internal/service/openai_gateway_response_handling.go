@@ -1300,6 +1300,9 @@ func mergeOpenAIUsageNonZero(dst *OpenAIUsage, src OpenAIUsage) {
 	if src.ImageOutputTokens > 0 {
 		dst.ImageOutputTokens = src.ImageOutputTokens
 	}
+	if src.ReasoningTokens > 0 {
+		dst.ReasoningTokens = src.ReasoningTokens
+	}
 }
 
 func openAIUsageHasTokens(usage *OpenAIUsage) bool {
@@ -1587,6 +1590,7 @@ func openAIUsageFromGJSON(value gjson.Result) (OpenAIUsage, bool) {
 		CacheCreation12hInputTokens: cache12h,
 		CacheReadInputTokens:        cacheReadTokens,
 		ImageOutputTokens:           int(imageOutputTokens),
+		ReasoningTokens:             reasoningTokens,
 	}, true
 }
 

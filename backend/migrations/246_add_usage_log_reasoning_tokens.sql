@@ -1,0 +1,12 @@
+-- Persist the upstream-reported reasoning token count per request
+-- (OpenAI usage.output_tokens_details.reasoning_tokens /
+-- usage.completion_tokens_details.reasoning_tokens). Used to detect silent
+-- capability degradation, e.g. subscription accounts returning far fewer
+-- reasoning tokens at the same reasoning effort.
+--
+-- NULL means historical rows, non-OpenAI platforms, or upstream responses that
+-- did not report reasoning tokens (or reported 0).
+--
+-- Nullable with no default: on PostgreSQL 11+ this is a metadata-only change
+-- and does not rewrite the (potentially large, partitioned) usage_logs table.
+ALTER TABLE usage_logs ADD COLUMN IF NOT EXISTS reasoning_tokens INTEGER;

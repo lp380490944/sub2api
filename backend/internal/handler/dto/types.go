@@ -689,6 +689,9 @@ type AdminUsageLog struct {
 	// UpstreamReasoningEffort is the effort actually forwarded after group policy /
 	// model-family remapping. Omitted when it matches the client-requested value.
 	UpstreamReasoningEffort *string `json:"upstream_reasoning_effort,omitempty"`
+	// ReasoningTokens is the upstream-reported reasoning token count (OpenAI
+	// output_tokens_details / completion_tokens_details). Omitted when unknown.
+	ReasoningTokens *int `json:"reasoning_tokens,omitempty"`
 	// UpstreamResponseModel is the raw model declared by the upstream response.
 	UpstreamResponseModel *string `json:"upstream_response_model,omitempty"`
 	// UpstreamModelMismatch is nil when the upstream did not declare a model.
