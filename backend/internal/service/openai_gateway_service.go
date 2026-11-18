@@ -227,6 +227,8 @@ type OpenAIUsage struct {
 	ImageCacheReadTokens        int `json:"image_cache_read_tokens,omitempty"`
 	OutputTokens                int `json:"output_tokens"`
 	CacheCreationInputTokens    int `json:"cache_creation_input_tokens,omitempty"`
+	CacheCreation5mTokens       int `json:"cache_creation_5m_tokens,omitempty"`
+	CacheCreation1hTokens       int `json:"cache_creation_1h_tokens,omitempty"`
 	CacheCreation30mInputTokens int `json:"cache_creation_30m_input_tokens,omitempty"`
 	CacheCreation12hInputTokens int `json:"cache_creation_12h_input_tokens,omitempty"`
 	CacheReadInputTokens        int `json:"cache_read_input_tokens,omitempty"`
@@ -235,6 +237,8 @@ type OpenAIUsage struct {
 	// (output_tokens_details / completion_tokens_details). Informational only:
 	// OutputTokens already carries the billable output (incl. reasoning).
 	ReasoningTokens int `json:"reasoning_tokens,omitempty"`
+
+	cacheCreationInputTokensPresent bool
 }
 
 // OpenAIForwardResult represents the result of forwarding
