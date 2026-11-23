@@ -97,6 +97,26 @@ func TestSameAccountRetryAllowedHonorsErrorMaxBeforeDeadline(t *testing.T) {
 	require.False(t, sameAccountRetryAllowed(err, 0, 0), "an explicit zero retry budget remains disabled")
 }
 
+// fork: OpenAI OAuth 瞬时 429 由 service 层带上 SameAccountRetryMax=3，
+// 即使 2 分钟重试窗口仍然有效，第 4 次也必须放弃同账号重试去换号。
+func TestSameAccountRetryAllowedCapsOAuth429WindowByCount(t *testing.T) {
+	err := &service.UpstreamFailoverError{
+		StatusCode:               429,
+		RetryableOnSameAccount:   true,
+		SameAccountRetryDelay:    8 * time.Second,
+		SameAccountRetryDeadline: time.Now().Add(2 * time.Minute),
+		SameAccountRetryMax:      3,
+	}
+	account := &service.Account{ID: 11, Platform: service.PlatformOpenAI, Type: service.AccountTypeOAuth}
+	limit := effectiveSameAccountRetryLimit(err, account)
+	require.Equal(t, 3, limit)
+	for count := 0; count < 3; count++ {
+		require.True(t, sameAccountRetryAllowed(err, count, limit), "retry %d should stay on the account", count+1)
+	}
+	require.False(t, sameAccountRetryAllowed(err, 3, limit), "the 4th retry must fall through to account switching")
+	require.False(t, sameAccountRetryAllowed(err, 13, limit))
+}
+
 func TestSameAccountRetryDeadlineAllows(t *testing.T) {
 	require.True(t, sameAccountRetryDeadlineAllows(&service.UpstreamFailoverError{}))
 	require.True(t, sameAccountRetryDeadlineAllows(&service.UpstreamFailoverError{

@@ -2072,6 +2072,8 @@ func TestOpenAIStreamingResponseFailedRateLimitDoesNotBlockAccountScheduling(t *
 	require.Equal(t, http.StatusTooManyRequests, failoverErr.StatusCode)
 	require.True(t, failoverErr.RetryableOnSameAccount)
 	require.False(t, failoverErr.SameAccountRetryDeadline.IsZero())
+	// fork: 瞬时 429 的同账号重试同时受次数上限约束，超限后换号而不是等满 2 分钟窗口。
+	require.Equal(t, openAIOAuth429MaxSameAccountRetries, failoverErr.SameAccountRetryMax)
 	require.False(t, svc.isOpenAIAccountRuntimeBlocked(account))
 }
 

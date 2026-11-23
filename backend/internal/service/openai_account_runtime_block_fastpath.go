@@ -10,11 +10,15 @@ import (
 )
 
 const (
-	openAIAccountStateUpdateTimeout       = 5 * time.Second
-	openAIOAuth429FallbackCooldown        = 5 * time.Second
-	openAIOAuth429RetryWindow             = 2 * time.Minute
-	openAIOAuth429RetryDelay              = 500 * time.Millisecond
-	openAIOAuth429MaxRetryDelay           = 8 * time.Second
+	openAIAccountStateUpdateTimeout = 5 * time.Second
+	openAIOAuth429FallbackCooldown  = 5 * time.Second
+	openAIOAuth429RetryWindow       = 2 * time.Minute
+	openAIOAuth429RetryDelay        = 500 * time.Millisecond
+	openAIOAuth429MaxRetryDelay     = 8 * time.Second
+	// fork: 同账号重试的次数上限。上游只用 openAIOAuth429RetryWindow（2 分钟）约束，
+	// 瞬时 429（如 "Codex is at capacity"）会让单个请求在同一账号上空等到窗口结束。
+	// 加上次数上限后，超限即走正常换号流程；窗口与账号冷却逻辑不变。
+	openAIOAuth429MaxSameAccountRetries   = 3
 	openAIOAuth429MaxAccountAttempts      = 3
 	openAIStopSchedulingBridgeCooldown    = 2 * time.Minute
 	openAIOAuth429StormWindow             = 10 * time.Second
