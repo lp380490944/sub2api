@@ -61,3 +61,30 @@ func writeOpenAIUpstreamClientError(c *gin.Context, statusCode int, body []byte,
 func WriteOpenAIUpstreamClientError(c *gin.Context, statusCode int, body []byte, upstreamMsg string) {
 	writeOpenAIUpstreamClientError(c, statusCode, body, upstreamMsg)
 }
+
+// openAIContextLengthExceededCode 是 OpenAI 对上下文超限的标准错误码。
+const openAIContextLengthExceededCode = "context_length_exceeded"
+
+// openAIContextWindowClientStatus 对上下文超限统一给出 400 invalid_request_error。
+//
+// 上下文超限是确定性请求失败：同一份请求体换账号、换渠道都会失败。上游常把它
+// 包成 HTTP 200 SSE 上的 response.failed 或 5xx，若照旧归一成 502，下游网关
+// （如 New-API）会把它当成可重试的上游故障跨渠道重放，徒增一次上游调用与等待；
+// 400 + context_length_exceeded 则让下游停止重试、让客户端触发自动压缩。
+func openAIContextWindowClientStatus(message string, payload []byte) (int, string, bool) {
+	if !isOpenAIContextWindowError(message, payload) {
+		return 0, "", false
+	}
+	return http.StatusBadRequest, openAIUpstreamClientErrorFallbackType, true
+}
+
+// openAIContextWindowErrorBody 构造 Responses/Chat 形状的上下文超限错误体。
+func openAIContextWindowErrorBody(message string) gin.H {
+	return gin.H{
+		"error": gin.H{
+			"type":    openAIUpstreamClientErrorFallbackType,
+			"code":    openAIContextLengthExceededCode,
+			"message": message,
+		},
+	}
+}

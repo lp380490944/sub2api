@@ -851,6 +851,21 @@ func writeOpenAIPassthroughErrorEnvelope(c *gin.Context, downstreamStatus int, u
 	c.Data(downstreamStatus, "application/json; charset=utf-8", body)
 }
 
+// writeOpenAIContextWindowErrorEnvelope 以 400 + context_length_exceeded 写出
+// 上下文超限错误（见 openAIContextWindowClientStatus），保留净化后的头策略与
+// compact SSE 桥接。
+func writeOpenAIContextWindowErrorEnvelope(c *gin.Context, upstreamHeaders http.Header, message string) {
+	if c == nil {
+		return
+	}
+	body, _ := json.Marshal(openAIContextWindowErrorBody(message))
+	if writeOpenAICompactSSEBridge(c, http.StatusBadRequest, body) {
+		return
+	}
+	writeOpenAIPassthroughErrorHeaders(c.Writer.Header(), upstreamHeaders)
+	c.Data(http.StatusBadRequest, "application/json; charset=utf-8", body)
+}
+
 func (s *OpenAIGatewayService) handleFailoverErrorResponsePassthrough(
 	ctx context.Context,
 	resp *http.Response,
@@ -962,7 +977,7 @@ func (s *OpenAIGatewayService) handleErrorResponsePassthrough(
 	// 已保证不切号），其文案对客户端可操作（如触发自动压缩）；在净化信封内保留
 	// 脱敏后的上游消息，而不是抹成通用文案。
 	if isOpenAIContextWindowError(upstreamMsg, body) && upstreamMsg != "" {
-		writeOpenAIPassthroughErrorEnvelope(c, resp.StatusCode, resp.Header, upstreamMsg)
+		writeOpenAIContextWindowErrorEnvelope(c, resp.Header, upstreamMsg)
 	} else {
 		writeSanitizedOpenAIPassthroughError(c, resp.StatusCode, resp.Header)
 	}
@@ -1415,6 +1430,9 @@ func openAIStreamFailedEventSemanticStatus(payload []byte, message string) int {
 func openAIStreamFailureStatus(payload []byte, message string) int {
 	if len(bytes.TrimSpace(payload)) == 0 || !gjson.ValidBytes(payload) {
 		return http.StatusBadGateway
+	}
+	if status, _, ok := openAIContextWindowClientStatus(message, payload); ok {
+		return status
 	}
 	semanticStatus := openAIStreamFailedEventSemanticStatus(payload, message)
 	switch semanticStatus {

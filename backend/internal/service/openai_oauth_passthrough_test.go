@@ -1793,7 +1793,7 @@ func TestOpenAIGatewayService_APIKeyPassthrough_Transient5xxTriggersFailover(t *
 	}
 }
 
-func TestOpenAIGatewayService_APIKeyPassthrough_ContextWindow502DoesNotFailover(t *testing.T) {
+func TestOpenAIGatewayService_APIKeyPassthrough_ContextWindow502Returns400WithoutFailover(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	rec := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(rec)
@@ -1822,7 +1822,8 @@ func TestOpenAIGatewayService_APIKeyPassthrough_ContextWindow502DoesNotFailover(
 	var failoverErr *UpstreamFailoverError
 	require.False(t, errors.As(err, &failoverErr), "context-window errors are deterministic request failures")
 	require.True(t, c.Writer.Written())
-	require.Equal(t, http.StatusBadGateway, rec.Code)
+	require.Equal(t, http.StatusBadRequest, rec.Code)
+	require.Contains(t, rec.Body.String(), "context_length_exceeded")
 	require.Contains(t, rec.Body.String(), "exceeds the context window")
 	require.True(t, body.closed)
 }

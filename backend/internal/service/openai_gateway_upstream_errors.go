@@ -716,6 +716,12 @@ func (s *OpenAIGatewayService) handleErrorResponse(
 			Detail:             upstreamDetail,
 		})
 		MarkResponseCommitted(c)
+		// 上下文超限是请求级错误，与账号的自定义错误码无关：仍回 400，
+		// 否则通用 500 会被下游网关当成上游故障重放。
+		if _, _, ok := openAIContextWindowClientStatus(upstreamMsg, body); ok && upstreamMsg != "" {
+			c.JSON(http.StatusBadRequest, openAIContextWindowErrorBody(upstreamMsg))
+			return nil, fmt.Errorf("upstream error: %d (not in custom error codes) message=%s", resp.StatusCode, upstreamMsg)
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": gin.H{
 				"type":    "upstream_error",
@@ -808,8 +814,9 @@ func (s *OpenAIGatewayService) handleErrorResponse(
 		errType = "upstream_error"
 		errMsg = "Upstream request failed"
 	}
-	if isOpenAIContextWindowError(upstreamMsg, body) && upstreamMsg != "" {
-		errMsg = upstreamMsg
+	if _, _, ok := openAIContextWindowClientStatus(upstreamMsg, body); ok && upstreamMsg != "" {
+		c.JSON(http.StatusBadRequest, openAIContextWindowErrorBody(upstreamMsg))
+		return nil, fmt.Errorf("upstream error: %d message=%s", resp.StatusCode, upstreamMsg)
 	}
 
 	c.JSON(statusCode, gin.H{
@@ -922,6 +929,11 @@ func (s *OpenAIGatewayService) handleCompatErrorResponse(
 			Detail:             upstreamDetail,
 		})
 		MarkResponseCommitted(c)
+		// 上下文超限是请求级错误，与账号的自定义错误码无关（同 handleErrorResponse）。
+		if status, cwType, ok := openAIContextWindowClientStatus(upstreamMsg, body); ok {
+			writeError(c, status, cwType, upstreamMsg)
+			return nil, fmt.Errorf("upstream error: %d (not in custom error codes) message=%s", resp.StatusCode, upstreamMsg)
+		}
 		writeError(c, http.StatusInternalServerError, "api_error", "Upstream gateway error")
 		if upstreamMsg == "" {
 			return nil, fmt.Errorf("upstream error: %d (not in custom error codes)", resp.StatusCode)
@@ -976,6 +988,10 @@ func (s *OpenAIGatewayService) handleCompatErrorResponse(
 		errType = "api_error"
 	}
 
-	writeError(c, resp.StatusCode, errType, upstreamMsg)
+	statusCode := resp.StatusCode
+	if status, cwType, ok := openAIContextWindowClientStatus(upstreamMsg, body); ok {
+		statusCode, errType = status, cwType
+	}
+	writeError(c, statusCode, errType, upstreamMsg)
 	return nil, fmt.Errorf("upstream error: %d %s", resp.StatusCode, upstreamMsg)
 }

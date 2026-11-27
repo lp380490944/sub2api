@@ -669,7 +669,11 @@ func (s *OpenAIGatewayService) handleAnthropicBufferedStreamingResponse(
 			writeAnthropicError(c, status, errType, errMsg)
 			return nil, fmt.Errorf("upstream response failed (passthrough): %s", errMsg)
 		}
-		writeAnthropicError(c, http.StatusBadGateway, "api_error", message)
+		if status, errType, ok := openAIContextWindowClientStatus(message, payload); ok {
+			writeAnthropicError(c, status, errType, message)
+		} else {
+			writeAnthropicError(c, http.StatusBadGateway, "api_error", message)
+		}
 		return nil, fmt.Errorf("upstream response failed: %s", message)
 	}
 	if strings.TrimSpace(finalResponse.Status) == "completed" {
@@ -1187,6 +1191,9 @@ func (s *OpenAIGatewayService) handleAnthropicStreamingResponse(
 				s.handleOpenAIStreamTerminalAccountSideEffects(c, account, payloadBytes, message, resp.Header, upstreamModel)
 				message = s.recordOpenAIStreamUpstreamError(c, account, false, requestID, "http_error", payloadBytes, message)
 				errStatus, errType, errMsg := http.StatusBadGateway, "api_error", message
+				if status, cwType, ok := openAIContextWindowClientStatus(message, payloadBytes); ok {
+					errStatus, errType = status, cwType
+				}
 				// 统一走语义状态推断 + body 归一化（与 /v1/responses 路径一致），
 				// 使按错误码配置的透传规则可命中。
 				if status, et, em, matched := applyOpenAIStreamFailedErrorPassthroughRule(
